@@ -31,7 +31,7 @@ export default function StoryHero() {
       <Navbar />
       {/* Background Leaves */}
       <div className="absolute inset-0 pointer-events-none">
-        {[...Array(20)].map((_, i) => (
+        {[...Array(100)].map((_, i) => (
           <svg
             key={i}
             className="absolute text-[#6e8f6e]/80"
@@ -41,7 +41,7 @@ export default function StoryHero() {
               top: `${Math.random() * 50}%`,
               left: `${Math.random() * 100}%`,
               animation: `fall 20s ease-in-out infinite`,
-              animationDelay: `${Math.random() * 5}s`,
+              animationDelay: `${Math.random() * 10}s`,
               transform: `rotate(${Math.random() * 360}deg)`,
               opacity: `0.5`,
             }}
@@ -117,11 +117,11 @@ export default function StoryHero() {
               exit={{ opacity: 0, y: 40 }}
               transition={{ duration: 0.6, ease: 'easeOut' }}
             >
-              <div className="relative w-full max-w-lg p-10 bg-[#6e8f6e]/20 bg-gradient-to-b from-[#f3f6f3]/70 to-[#6e8f6e]/30 backdrop-blur-md border border-[#6e8f6e]/40 rounded-lg shadow-sm flex flex-col gap-6">
+              <div className="relative w-full max-w-lg p-10 bg-[#506850]/20 bg-gradient-to-b from-[#f3f6f3]/70 to-[#6e8f6e]/30 backdrop-blur-md border border-[#6e8f6e]/40 rounded-lg shadow-sm flex flex-col gap-6">
                 {/* Close Button */}
                 <motion.button
                   onClick={handleCloseClick}
-                  className="absolute top-4 right-4 w-8 h-8 bg-[#6e8f6e] text-[#f0f5f0] font-inter font-medium text-lg rounded-full flex items-center justify-center hover:bg-[#88a978] focus:outline-none focus:ring-2 focus:ring-[#88a978]/40 transition-all duration-300"
+                  className="absolute top-4 right-4 w-8 h-8 bg-[#506850] text-[#f0f5f0] font-inter font-medium text-lg rounded-full flex items-center justify-center hover:bg-[#88a978] focus:outline-none focus:ring-2 focus:ring-[#88a978]/40 transition-all duration-300"
                   whileHover={{ scale: 1.1 }}
                   whileTap={{ scale: 0.9 }}
                 >
@@ -151,7 +151,7 @@ export default function StoryHero() {
                   <div className="relative w-64 bg-[#f3f6f3]/50 border border-[#3b5f3b]/50 rounded-full flex items-center justify-between p-1">
                     {/* Sliding Background */}
                     <motion.div
-                      className="absolute top-1 bottom-1 w-1/2 bg-[#6e8f6e] rounded-full shadow-sm shadow-[#6e8f6e]/40"
+                      className="absolute top-1 bottom-1 w-1/2 bg-[#506850] rounded-full shadow-sm shadow-[#6e8f6e]/40"
                       initial={false}
                       animate={{ x: formMode === 'url' ? 0 : '100%' }}
                       transition={{ duration: 0.3, ease: 'easeInOut' }}
@@ -213,7 +213,7 @@ export default function StoryHero() {
                   {/* Submit Button */}
                   <motion.button
                     type="submit"
-                    className="px-6 py-2.5 bg-gradient-to-r from-[#6e8f6e] to-[#88a978] text-[#f0f5f0] font-inter font-medium text-base rounded-sm border border-[#6e8f6e] hover:from-[#88a978] hover:to-[#a8c7a8] hover:border-[#88a978] hover:shadow-lg hover:shadow-[#88a978]/50 focus:outline-none focus:ring-2 focus:ring-[#88a978]/40 transition-all duration-300"
+                    className="px-6 py-2.5 bg-gradient-to-r from-[#506850] to-[#88a978] text-[#f0f5f0] font-inter font-medium text-base rounded-sm border border-[#6e8f6e] hover:from-[#88a978] hover:to-[#a8c7a8] hover:border-[#88a978] hover:shadow-lg hover:shadow-[#88a978]/50 focus:outline-none focus:ring-2 focus:ring-[#88a978]/40 transition-all duration-300"
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.5, ease: 'easeOut', delay: 0.4 }}
