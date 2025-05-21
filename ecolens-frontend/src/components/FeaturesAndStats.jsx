@@ -1,35 +1,8 @@
 // src/components/FeaturesAndStats.jsx
 import { motion } from 'framer-motion';
-import { FaSearch, FaLeaf, FaChartBar, FaUsers } from 'react-icons/fa';
-import { useState, useEffect } from 'react';
+import { FaSearch, FaLeaf, FaChartBar, FaDownload } from 'react-icons/fa';
 
 const FeaturesAndStats = () => {
-  const [statsInView, setStatsInView] = useState(false);
-  const [productsAnalyzed, setProductsAnalyzed] = useState(0);
-  const [usersMakingGreenerChoices, setUsersMakingGreenerChoices] = useState(0);
-  const [usersEducated, setUsersEducated] = useState(0);
-
-  // Counter animation for stats when the section comes into view
-  useEffect(() => {
-    if (statsInView) {
-      const productsInterval = setInterval(() => {
-        setProductsAnalyzed((prev) => (prev < 200 ? prev + 4 : 200));
-      }, 20);
-      const greenerChoicesInterval = setInterval(() => {
-        setUsersMakingGreenerChoices((prev) => (prev < 25 ? prev + 1 : 25));
-      }, 60);
-      const usersEducatedInterval = setInterval(() => {
-        setUsersEducated((prev) => (prev < 300 ? prev + 6 : 300));
-      }, 40);
-
-      return () => {
-        clearInterval(productsInterval);
-        clearInterval(greenerChoicesInterval);
-        clearInterval(usersEducatedInterval);
-      };
-    }
-  }, [statsInView]);
-
   return (
     <>
       {/* Features Section */}
@@ -68,103 +41,97 @@ const FeaturesAndStats = () => {
             Why Choose EcoLens?
           </motion.h2>
           <div className="flex flex-col md:flex-row gap-8">
-            {/* Card 1: Real-Time Eco-Impact Analysis */}
+            {/* Card 1: Real-Time Environmental Analysis */}
             <motion.div
-              className="flex-1 p-6 bg-[#e8f0e8]/80 border border-[#6e8f6e]/40 rounded-lg shadow-lg"
+              className="flex-1 p-6 bg-gradient-to-br from-[#506850]/90 to-[#3b5f3b]/90 border border-[#6e8f6e]/60 rounded-lg shadow-md hover:shadow-lg hover:shadow-[#88a978]/40 transition-all duration-300"
               initial={{ opacity: 0, y: 40 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.8, ease: 'easeOut', delay: 0.2 }}
+              whileHover={{
+                scale: 1.05,
+                borderColor: '#88a978',
+                transition: { duration: 0.3 },
+              }}
             >
-              <div className="flex items-center justify-center w-12 h-12 bg-[#88a978]/20 rounded-full mb-4">
-                <FaSearch color="#506850" size={24} />
-              </div>
-              <h3 className="text-xl font-inter font-semibold text-[#1a2c1a] mb-2">
-                Real-Time Eco-Impact Analysis
+              <motion.div
+                className="flex items-center justify-center w-12 h-12 bg-[#88a978]/30 rounded-full mb-4"
+                whileHover={{
+                  rotate: 360,
+                  backgroundColor: '#88a978',
+                  transition: { duration: 0.5 },
+                }}
+              >
+                <FaSearch color="#f0f5f0" size={24} />
+              </motion.div>
+              <h3 className="text-xl font-inter font-semibold text-[#f0f5f0] mb-2">
+                Real-Time Environmental Analysis
               </h3>
-              <p className="text-base font-inter text-[#2f3b2f]">
-                Get instant insights into the environmental impact of products while you shop online.
+              <p className="text-base font-inter text-[#d9e2d9]">
+                Get instant insights into the environmental effects of products while you shop online.
               </p>
             </motion.div>
             {/* Card 2: Seamless Product Scanning */}
             <motion.div
-              className="flex-1 p-6 bg-[#d9e2d9]/80 border border-[#6e8f6e]/40 rounded-lg shadow-lg"
+              className="flex-1 p-6 bg-gradient-to-br from-[#506850]/90 to-[#3b5f3b]/90 border border-[#6e8f6e]/60 rounded-lg shadow-md hover:shadow-lg hover:shadow-[#88a978]/40 transition-all duration-300"
               initial={{ opacity: 0, y: 40 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.8, ease: 'easeOut', delay: 0.4 }}
+              whileHover={{
+                scale: 1.05,
+                borderColor: '#88a978',
+                transition: { duration: 0.3 },
+              }}
             >
-              <div className="flex items-center justify-center w-12 h-12 bg-[#88a978]/20 rounded-full mb-4">
-                <FaLeaf color="#506850" size={24} />
-              </div>
-              <h3 className="text-xl font-inter font-semibold text-[#1a2c1a] mb-2">
+              <motion.div
+                className="flex items-center justify-center w-12 h-12 bg-[#88a978]/30 rounded-full mb-4"
+                whileHover={{
+                  rotate: 360,
+                  backgroundColor: '#88a978',
+                  transition: { duration: 0.5 },
+                }}
+              >
+                <FaLeaf color="#f0f5f0" size={24} />
+              </motion.div>
+              <h3 className="text-xl font-inter font-semibold text-[#f0f5f0] mb-2">
                 Seamless Product Scanning
               </h3>
-              <p className="text-base font-inter text-[#2f3b2f]">
+              <p className="text-base font-inter text-[#d9e2d9]">
                 Scan products with a single click to uncover their sustainability metrics.
               </p>
             </motion.div>
             {/* Card 3: Detailed Sustainability Insights */}
             <motion.div
-              className="flex-1 p-6 bg-[#c8d8c8]/80 border border-[#6e8f6e]/40 rounded-lg shadow-lg"
+              className="flex-1 p-6 bg-gradient-to-br from-[#506850]/90 to-[#3b5f3b]/90 border border-[#6e8f6e]/60 rounded-lg shadow-md hover:shadow-lg hover:shadow-[#88a978]/40 transition-all duration-300"
               initial={{ opacity: 0, y: 40 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.8, ease: 'easeOut', delay: 0.6 }}
+              whileHover={{
+                scale: 1.05,
+                borderColor: '#88a978',
+                transition: { duration: 0.3 },
+              }}
             >
-              <div className="flex items-center justify-center w-12 h-12 bg-[#88a978]/20 rounded-full mb-4">
-                <FaChartBar color="#506850" size={24} />
-              </div>
-              <h3 className="text-xl font-inter font-semibold text-[#1a2c1a] mb-2">
+              <motion.div
+                className="flex items-center justify-center w-12 h-12 bg-[#88a978]/30 rounded-full mb-4"
+                whileHover={{
+                  rotate: 360,
+                  backgroundColor: '#88a978',
+                  transition: { duration: 0.5 },
+                }}
+              >
+                <FaChartBar color="#f0f5f0" size={24} />
+              </motion.div>
+              <h3 className="text-xl font-inter font-semibold text-[#f0f5f0] mb-2">
                 Detailed Sustainability Insights
               </h3>
-              <p className="text-base font-inter text-[#2f3b2f]">
+              <p className="text-base font-inter text-[#d9e2d9]">
                 Access in-depth metrics like sustainability scores, carbon footprint, and materials breakdown.
               </p>
             </motion.div>
           </div>
-        </div>
-      </section>
-
-      {/* Stats Section */}
-      <section className="relative py-12 px-10 md:px-24">
-        <div className="relative z-10 max-w-5xl mx-auto">
-          <motion.h2
-            className="text-3xl md:text-4xl font-inter font-bold text-[#1a2c1a] text-center mb-12"
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6, ease: 'easeOut' }}
-          >
-            Our Impact
-          </motion.h2>
-          <motion.div
-            className="flex flex-col md:flex-row gap-8 justify-center items-center"
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            onViewportEnter={() => setStatsInView(true)}
-            viewport={{ once: true }}
-            transition={{ duration: 0.8, ease: 'easeOut' }}
-          >
-            {/* Stat 1: Products Analyzed */}
-            <div className="flex flex-col items-center text-center">
-              <div className="text-4xl mb-2">♻️</div>
-              <p className="text-2xl font-inter font-bold text-[#1a2c1a]">{productsAnalyzed}+</p>
-              <p className="text-base font-inter text-[#2f3b2f]">Products Analyzed</p>
-            </div>
-            {/* Stat 2: Users Making Greener Choices */}
-            <div className="flex flex-col items-center text-center">
-              <div className="text-4xl mb-2">🌱</div>
-              <p className="text-2xl font-inter font-bold text-[#1a2c1a]">{usersMakingGreenerChoices}%</p>
-              <p className="text-base font-inter text-[#2f3b2f]">Users Making Greener Choices</p>
-            </div>
-            {/* Stat 3: Users Educated on Sustainability */}
-            <div className="flex flex-col items-center text-center">
-              <div className="text-4xl mb-2">🌍</div>
-              <p className="text-2xl font-inter font-bold text-[#1a2c1a]">{usersEducated}+</p>
-              <p className="text-base font-inter text-[#2f3b2f]">Users Educated on Sustainability</p>
-            </div>
-          </motion.div>
         </div>
       </section>
     </>

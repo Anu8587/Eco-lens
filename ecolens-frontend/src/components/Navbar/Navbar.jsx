@@ -1,3 +1,4 @@
+// src/components/Navbar.jsx
 import { motion } from 'framer-motion';
 import EcoMascot from '../Mascot/EcoMascot';
 
@@ -10,16 +11,15 @@ export default function Navbar() {
   };
 
   return (
-    <nav className="relative z-20 flex items-center justify-between px-6 md:px-16 py-0 bg-[#3f513f]/90 backdrop-blur-md border-b border-b-[#506850]/50 shadow-sm">
-      {/* Logo and Leaf */}
-      <div className="flex items-center gap-0">
-        {/* Leaf Icon */}
-        <EcoMascot className="w-18 h-18" />
+    <nav className="fixed top-0 left-0 w-full z-50 flex items-center justify-between px-6 md:px-16 py-4 bg-gradient-to-r from-[#506850] to-[#88a978] backdrop-blur-md shadow-md">
+      {/* Logo and Mascot */}
+      <div className="flex items-center gap-2">
+        {/* EcoMascot */}
+        <EcoMascot className="w-10 h-10" />
 
         {/* EcoLens Logo Text */}
         <motion.div
-          className="text-lg md:text-xl text-[#f0f5f0]"
-          style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, letterSpacing: '0.05em' }}
+          className="text-xl md:text-2xl text-[#f0f5f0] font-inter font-bold tracking-wide"
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
@@ -29,14 +29,17 @@ export default function Navbar() {
       </div>
 
       {/* Nav Buttons */}
-      <div className="flex gap-8">
-        {['home', 'about', 'contact'].map((item) => (
+      <div className="flex gap-10">
+        {['home', 'features', 'contact', 'newsletter'].map((item) => (
           <motion.button
             key={item}
             onClick={() => handleScroll(item)}
-            className="text-[#f0f5f0] hover:text-[#9fbf99] font-['Urbanist'] text-sm md:text-base font-medium transition-colors duration-200"
-            whileHover={{ scale: 1.04 }}
-            whileTap={{ scale: 0.96 }}
+            className="text-[#f0f5f0] hover:text-[#d4e157] font-inter text-base md:text-lg font-medium transition-colors duration-300"
+            whileHover={{ scale: 1.1, transition: { duration: 0.2 } }}
+            whileTap={{ scale: 0.95 }}
+            initial={{ opacity: 0, x: 10 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5, delay: 0.1 * (['home', 'features', 'contact', 'newsletter'].indexOf(item) + 1) }}
           >
             {item.charAt(0).toUpperCase() + item.slice(1)}
           </motion.button>
