@@ -1,13 +1,11 @@
 // src/components/ExtensionPromo.jsx
 import { motion } from 'framer-motion';
 import { FaCheck } from 'react-icons/fa';
-
-// Import the banner image
 import placeholderBanner from '../assets/placeholder-banner.png';
 
 const ExtensionPromo = () => {
   return (
-    <section className="relative bg-gradient-to-b from-[#d9e2d9] to-[#506850]/40 py-16 px-10 md:px-24 overflow-hidden">
+    <section className="relative py-16 px-10 md:px-24 overflow-hidden">
       {/* Background Leaves (for visual excitement) */}
       <div className="absolute inset-0 pointer-events-none">
         {[...Array(50)].map((_, i) => (

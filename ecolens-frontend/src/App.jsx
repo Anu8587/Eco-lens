@@ -1,16 +1,20 @@
 // src/App.jsx
 import StoryHero from './components/Hero/StoryHero';
 import ExtensionPromo from './components/ExtensionPromo';
+import FeaturesAndStats from './components/FeaturesAndStats';
 import { motion } from 'framer-motion';
 
 function App() {
   return (
-    <div className="App bg-gradient-to-b from-[#d9e2d9] to-[#506850]/40 min-h-screen">
+    <div className="App bg-gradient-to-b from-[#d9e2d9] to-[#506850]/40 min-h-screen flex flex-col">
       {/* Hero Section */}
       <StoryHero />
 
       {/* Extension Promo and Banner Image Sections */}
       <ExtensionPromo />
+
+      {/* Features and Stats Sections */}
+      <FeaturesAndStats />
 
       {/* Main Sections */}
       {/* About Section */}
