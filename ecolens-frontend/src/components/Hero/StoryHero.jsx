@@ -4,6 +4,7 @@ import heroImage from '../../assets/hero.png';
 import { useState, useRef, useEffect } from 'react';
 import { FaLeaf, FaCloud, FaLightbulb, FaRedo, FaCheck, FaWater, FaBolt } from 'react-icons/fa';
 import { GiClothJar } from 'react-icons/gi';
+import axios from 'axios';
 
 const StoryHero = () => {
   const [isFormVisible, setIsFormVisible] = useState(false);
@@ -54,92 +55,37 @@ const StoryHero = () => {
     setIsFormVisible(false);
   };
 
-  // Mock AI-generated data with AI Insights
-  const mockReportData = {
-    sustainabilityScore: {
-      score: 7,
-      description: 'Moderately eco-friendly',
-      breakdown: [
-        { factor: 'Materials', value: 3, max: 5, note: 'Sourced sustainably' },
-        { factor: 'Manufacturing', value: 2, max: 3, note: 'Energy-intensive process' },
-        { factor: 'Packaging', value: 2, max: 2, note: 'Minimal packaging' },
-      ],
-      aiInsights: 'Your sustainability score is above average. Focus on improving manufacturing processes by adopting renewable energy sources to boost your score further.',
-    },
-    carbonFootprint: {
-      value: 5,
-      unit: 'kg CO₂e',
-      comparison: 'Equivalent to driving 12 miles in a car',
-      comparisonNote: 'Based on average car emissions of 0.4 kg CO₂e per mile',
-      reductionTip: 'Choose locally made products to reduce shipping emissions',
-      aiInsights: 'Your carbon footprint is moderate. Consider sourcing materials closer to the manufacturing site to cut down on transportation emissions.',
-    },
-    materials: [
-      {
-        name: 'Organic Cotton',
-        percentage: 80,
-        impact: 'Low',
-        note: 'Low impact, biodegradable',
-        details: { sourcedFrom: 'India', certification: 'GOTS' },
-      },
-      {
-        name: 'Polyester',
-        percentage: 20,
-        impact: 'High',
-        note: 'Synthetic, higher impact',
-        details: { sourcedFrom: 'China', certification: 'None' },
-      },
-    ],
-    materialsAiInsights: 'The high polyester content increases your environmental impact. Switching to recycled polyester or increasing the organic cotton percentage could improve sustainability.',
-    waterUsage: {
-      value: 150,
-      unit: 'liters',
-      comparison: 'Equivalent to 3 average showers',
-      comparisonNote: 'Based on an average shower using 50 liters',
-      reductionTip: 'Opt for materials that require less water in production',
-      aiInsights: 'Water usage is relatively high due to cotton production. Consider using drought-resistant cotton varieties or alternative fibers like hemp.',
-    },
-    energyConsumption: {
-      value: 10,
-      unit: 'kWh',
-      comparison: 'Equivalent to running a laptop for 50 hours',
-      comparisonNote: 'Based on an average laptop using 0.2 kWh per hour',
-      reductionTip: 'Choose products from brands using renewable energy',
-      aiInsights: 'Energy consumption is moderate. Partnering with manufacturers that use solar or wind energy can significantly reduce this metric.',
-    },
-    ecoTips: {
-      primary: 'Choose 100% organic materials for a lower impact',
-      secondary: [
-        'Buy second-hand to reduce demand',
-        'Look for recyclable packaging',
-        'Support brands with transparent supply chains',
-      ],
-      aiInsights: 'Your eco tips align well with sustainable practices. Additionally, consider advocating for extended producer responsibility to enhance lifecycle management.',
-    },
-  };
+ 
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    const formData = new FormData(e.target);
-    const input = formMode === 'url' ? formData.get('productLink') : formData.get('productDescription');
+  const handleSubmit = async (e) => {
+  e.preventDefault();
+  const formData = new FormData(e.target);
+  const input = formMode === 'url' ? formData.get('productLink') : formData.get('productDescription');
 
-    // Basic validation
-    if (!input || input.trim() === '') {
-      setError(formMode === 'url' ? 'Please enter a valid URL' : 'Please enter a product description');
-      return;
-    }
-    if (formMode === 'url' && !input.startsWith('http')) {
-      setError('Please enter a valid URL starting with http:// or https://');
-      return;
-    }
+  // Basic validation
+  if (!input || input.trim() === '') {
+    setError(formMode === 'url' ? 'Please enter a valid URL' : 'Please enter a product description');
+    return;
+  }
+  if (formMode === 'url' && !input.startsWith('http')) {
+    setError('Please enter a valid URL starting with http:// or https://');
+    return;
+  }
 
-    // Clear error, set report data, and show the Eco Report
-    setError(null);
-    setReport(mockReportData);
+  // Clear error and make API call
+  setError(null);
+  try {
+    const response = await axios.post('http://localhost:5000/api/analyze', {
+      productLink: formMode === 'url' ? input : '',
+      productDescription: formMode === 'description' ? input : '',
+    });
+    setReport(response.data);
     setIsFormVisible(false);
     setActiveTab('sustainabilityScore');
-  };
-
+  } catch (err) {
+    setError('Failed to analyze the product. Please try again.');
+  }
+};
   // Calculate pie chart slices for materials
   const calculatePieChart = (materials) => {
     let startAngle = 0;
