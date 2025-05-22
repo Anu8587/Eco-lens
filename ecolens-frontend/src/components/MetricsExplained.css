@@ -1,0 +1,206 @@
+.metrics-explained {
+  padding: 3rem 1.5rem;
+  background: linear-gradient(to bottom, #e8f5e9 0%, #d4e4d4 100%);
+  position: relative;
+  overflow: hidden;
+  min-height: 500px;
+}
+
+/* Leaf Pattern */
+.metrics-explained::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23506850" opacity="0.1"><path d="M12 3C12 3 9 6 9 9C9 12 12 15 12 15C12 15 15 12 15 9C15 6 12 3 12 3Z"/></svg>')
+    repeat;
+  background-size: 50px 50px;
+  opacity: 0.05;
+}
+
+.metrics-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.metrics-title {
+  font-family: 'Inter', sans-serif;
+  font-size: 2.25rem;
+  font-weight: 800;
+  color: #1a2c1a;
+  margin-bottom: 0.5rem;
+  letter-spacing: -0.02em;
+}
+
+.metrics-subtitle {
+  font-family: 'Playfair Display', serif;
+  font-style: italic;
+  font-size: 1.1rem;
+  color: #2f3b2f;
+  max-width: 600px;
+  margin: 0 auto;
+  line-height: 1.5;
+  opacity: 0.9;
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-rows: repeat(2, auto);
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.5rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.metric-card {
+  background: linear-gradient(135deg, #ffffff 0%, #f0f5f0 100%);
+  border: 1px solid rgba(136, 169, 120, 0.2);
+  border-radius: 12px;
+  padding: 1.25rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+/* Alternating Layout */
+.metric-card.top-row {
+  transform: translateY(0);
+}
+
+.metric-card.bottom-row {
+  transform: translateY(0);
+}
+
+.metric-card:nth-child(odd) {
+  transform: rotate(-1deg);
+}
+
+.metric-card:nth-child(even) {
+  transform: rotate(1deg);
+}
+
+.metric-card:hover {
+  transform: translateY(-4px) rotate(0deg);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+}
+
+.metric-icon {
+  font-size: 2rem;
+  color: #88a978;
+  margin-bottom: 1rem;
+  background: rgba(136, 169, 120, 0.1);
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.5s ease;
+}
+
+.metric-card:hover .metric-icon {
+  transform: rotate(360deg);
+}
+
+.metric-title {
+  font-family: 'Inter', sans-serif;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #1a2c1a;
+  margin-bottom: 0.5rem;
+  letter-spacing: -0.01em;
+}
+
+.metric-description {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.85rem;
+  color: #2f3b2f;
+  line-height: 1.6;
+  margin-bottom: 0.75rem;
+  flex-grow: 1;
+  opacity: 0.95;
+}
+
+.metric-learn-more {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #506850;
+  text-decoration: none;
+  padding: 0.4rem 1rem;
+  border-radius: 8px;
+  border: 1px solid #88a978;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.metric-learn-more:hover {
+  background-color: #88a978;
+  color: #f0f5f0;
+}
+
+@media (max-width: 1024px) {
+  .metrics-grid {
+    grid-template-columns: repeat(2, 1fr);
+    grid-template-rows: repeat(4, auto);
+  }
+
+  .metric-card.top-row,
+  .metric-card.bottom-row {
+    transform: translateY(0);
+  }
+
+  .metric-card:nth-child(odd) {
+    transform: rotate(-0.5deg);
+  }
+
+  .metric-card:nth-child(even) {
+    transform: rotate(0.5deg);
+  }
+}
+
+@media (max-width: 768px) {
+  .metrics-explained {
+    padding: 2rem 1rem;
+  }
+
+  .metrics-title {
+    font-size: 1.8rem;
+  }
+
+  .metrics-subtitle {
+    font-size: 1rem;
+  }
+
+  .metric-card {
+    padding: 1rem;
+  }
+
+  .metric-icon {
+    font-size: 1.8rem;
+    width: 40px;
+    height: 40px;
+  }
+
+  .metric-title {
+    font-size: 1.1rem;
+  }
+
+  .metric-description {
+    font-size: 0.8rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .metrics-grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: repeat(8, auto);
+  }
+
+  .metric-card:nth-child(odd),
+  .metric-card:nth-child(even) {
+    transform: rotate(0deg);
+  }
+}

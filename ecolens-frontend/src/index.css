@@ -38,3 +38,154 @@
     opacity: 0;
   }
 }
+.metrics-explained {
+  padding: 4rem 2rem;
+  background: linear-gradient(to bottom, #f0f5f0 0%, #d9e2d9 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Background Leaves (similar to StoryHero.jsx for consistency) */
+.metrics-explained::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23506850" opacity="0.1"><path d="M12 3C12 3 9 6 9 9C9 12 12 15 12 15C12 15 15 12 15 9C15 6 12 3 12 3Z"/></svg>')
+    repeat;
+  background-size: 50px 50px;
+  opacity: 0.05;
+}
+
+.metrics-header {
+  text-align: center;
+  margin-bottom: 2.5rem;
+}
+
+.metrics-title {
+  font-family: 'Inter', sans-serif;
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: #1a2c1a;
+  margin-bottom: 0.5rem;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.metrics-subtitle {
+  font-family: 'Playfair Display', serif;
+  font-style: italic;
+  font-size: 1.1rem;
+  color: #2f3b2f;
+  max-width: 600px;
+  margin: 0 auto;
+  line-height: 1.5;
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.metric-card {
+  background: linear-gradient(to bottom right, #ffffff 0%, #e8f0e8 100%);
+  border: 1px solid #6e8f6e40;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.metric-card:hover {
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+.metric-icon {
+  font-size: 2.5rem;
+  color: #88a978;
+  margin-bottom: 1rem;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+}
+
+.metric-title {
+  font-family: 'Inter', sans-serif;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #1a2c1a;
+  margin-bottom: 0.75rem;
+}
+
+.metric-description {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.9rem;
+  color: #2f3b2f;
+  line-height: 1.6;
+  margin-bottom: 1rem;
+  flex-grow: 1;
+}
+
+.metric-learn-more {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #506850;
+  text-decoration: none;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  border: 1px solid #88a978;
+  transition: all 0.3s ease;
+}
+
+.metric-learn-more:hover {
+  background-color: #88a978;
+  color: #f0f5f0;
+  border-color: #6e8f6e;
+}
+
+@media (max-width: 768px) {
+  .metrics-explained {
+    padding: 2rem 1rem;
+  }
+
+  .metrics-title {
+    font-size: 2rem;
+  }
+
+  .metrics-subtitle {
+    font-size: 1rem;
+  }
+
+  .metric-card {
+    padding: 1.25rem;
+  }
+
+  .metric-icon {
+    font-size: 2rem;
+  }
+
+  .metric-title {
+    font-size: 1.1rem;
+  }
+
+  .metric-description {
+    font-size: 0.85rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .metrics-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .metric-card {
+    padding: 1rem;
+  }
+}

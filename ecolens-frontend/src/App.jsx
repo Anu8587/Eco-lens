@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import StoryHero from './components/Hero/StoryHero'; // Adjusted path based on previous setup
 import ExtensionPromo from './components/ExtensionPromo';
+import MetricsExplained from './components/MetricsExplained'; // New component import
 import FeaturesAndStats from './components/FeaturesAndStats';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FaTwitter, FaInstagram, FaLinkedin, FaEnvelope, FaPhone, FaMapMarkerAlt, FaArrowLeft, FaArrowRight, FaUserCircle, FaAward, FaChevronDown, FaChevronUp, FaLeaf } from 'react-icons/fa';
@@ -89,6 +90,11 @@ function App() {
         </section>
 
         <ExtensionPromo />
+
+        {/* Metrics Explained Section */}
+        <section id="metrics-explained">
+          <MetricsExplained />
+        </section>
 
         <section id="features">
           <FeaturesAndStats />
@@ -550,7 +556,7 @@ function App() {
         </footer>
       </ErrorBoundary>
 
-      {/* Define the `fall` animation keyframes */}
+      {/* Define the `fall` animation keyframes and add pulse animation for MetricsExplained */}
       <style>{`
         @keyframes fall {
           0% {
@@ -562,10 +568,24 @@ function App() {
             opacity: 0.1;
           }
         }
+        @keyframes pulse {
+          0% {
+            transform: scale(1);
+            opacity: 1;
+          }
+          50% {
+            transform: scale(1.05);
+            opacity: 0.7;
+          }
+          100% {
+            transform: scale(1);
+            opacity: 1;
+          }
+        }
       `}</style>
 
-      {/* Load Poppins Font */}
-      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" />
+      {/* Load Fonts (Poppins, Inter, and Playfair Display) */}
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Playfair+Display:ital@1&display=swap" />
     </div>
   );
 }
