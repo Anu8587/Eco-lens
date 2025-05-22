@@ -1,66 +1,230 @@
 const express = require('express');
 const axios = require('axios');
 const cheerio = require('cheerio');
+const puppeteer = require('puppeteer');
 const cors = require('cors');
 require('dotenv').config();
 
 const app = express();
 const port = process.env.PORT || 5000;
 
-// Middleware
 app.use(cors());
 app.use(express.json());
 
-// In-memory cache
 const cache = new Map();
-const CACHE_DURATION = 60 * 60 * 1000; // 1 hour in milliseconds
+const CACHE_DURATION = 60 * 60 * 1000;
 
-// Helper to scrape product details from a URL
-const scrapeProductDetails = async (url) => {
-  try {
-    const { data } = await axios.get(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-      },
-    });
-    const $ = cheerio.load(data);
+const scrapeProductDetails = async (url, retries = 2) => {
+  // Helper to clean text
+  const cleanText = (text) => text?.replace(/\s+/g, ' ').trim() || '';
 
-    const title = $('h1').text().trim() || 'Unknown Product';
-    const description = $('#productDescription, .product-description, [data-testid="pdp-description"]').text().trim() || '';
-    const materials = $('[data-testid="materials"], .materials, .composition').text().trim() || '';
+  // Static scraping with Cheerio
+  const scrapeWithCheerio = async () => {
+    try {
+      const { data } = await axios.get(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        },
+        timeout: 10000,
+      });
+      const $ = cheerio.load(data);
 
-    return `${title}. ${description}. Materials: ${materials}.`.trim();
-  } catch (error) {
-    console.error('Error scraping URL:', error.message);
-    return null;
+      const selectors = {
+        title: [
+          'h1',
+          '#productTitle',
+          '.product-title',
+          '[data-testid="product-title"]',
+          'h2',
+          '.title',
+          '.product-name',
+          '[itemprop="name"]',
+        ],
+        description: [
+          '#productDescription',
+          '.product-description',
+          '[data-testid="pdp-description"]',
+          '#feature-bullets',
+          '.a-section.a-spacing-medium',
+          '[itemprop="description"]',
+          '.description',
+          '.product-details',
+        ],
+        materials: [
+          '[data-testid="materials"]',
+          '.materials',
+          '.composition',
+          '#productDetails_techSpec_section_1',
+          '.product-specs',
+          '.material-info',
+          '[data-material]',
+        ],
+        certifications: [
+          '.certifications',
+          '[data-testid="certifications"]',
+          '.product-certification',
+          '.eco-labels',
+          '.sustainability-info',
+          '[data-certification]',
+        ],
+        category: [
+          '.breadcrumb a',
+          '.nav-breadcrumb li',
+          '[data-testid="breadcrumb"]',
+          'meta[name="keywords"]',
+          'meta[name="description"]',
+        ],
+      };
+
+      const getText = (selectorArray) => {
+        for (const selector of selectorArray) {
+          let text = '';
+          if (selector.includes('meta')) {
+            const attr = selector.includes('keywords') ? 'keywords' : 'description';
+            text = $(`meta[name="${attr}"]`).attr('content') || '';
+          } else {
+            text = $(selector).map((i, el) => $(el).text().trim()).get().join(' ');
+          }
+          if (text) return cleanText(text);
+        }
+        return '';
+      };
+
+      const title = getText(selectors.title) || 'Unknown Product';
+      const description = getText(selectors.description) || '';
+      const materials = getText(selectors.materials) || '';
+      const certifications = getText(selectors.certifications) || '';
+      const category = getText(selectors.category) || '';
+
+      // Infer product category from text
+      const inferCategory = (text) => {
+        const lowerText = text.toLowerCase();
+        if (lowerText.includes('clothing') || lowerText.includes('shirt') || lowerText.includes('dress')) return 'Clothing';
+        if (lowerText.includes('electronics') || lowerText.includes('phone') || lowerText.includes('laptop')) return 'Electronics';
+        if (lowerText.includes('furniture') || lowerText.includes('table') || lowerText.includes('chair')) return 'Furniture';
+        if (lowerText.includes('food') || lowerText.includes('beverage') || lowerText.includes('organic')) return 'Food & Beverage';
+        return 'General';
+      };
+
+      const inferredCategory = inferCategory(`${title} ${description} ${category}`);
+
+      return {
+        title,
+        description,
+        materials,
+        certifications,
+        category: inferredCategory,
+        raw: `${title}. ${description}. Materials: ${materials}. Certifications: ${certifications}.`.trim(),
+      };
+    } catch (error) {
+      console.error(`Cheerio scraping error for ${url}:`, error.message);
+      return null;
+    }
+  };
+
+  // Dynamic scraping with Puppeteer
+  const scrapeWithPuppeteer = async () => {
+    let browser;
+    try {
+      browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox'] });
+      const page = await browser.newPage();
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 15000 });
+
+      const data = await page.evaluate(() => {
+        const cleanText = (text) => text?.replace(/\s+/g, ' ').trim() || '';
+        const getText = (selectors) => {
+          for (const sel of selectors) {
+            const el = document.querySelector(sel);
+            if (el) return cleanText(el.textContent || el.getAttribute('content') || '');
+          }
+          return '';
+        };
+
+        const selectors = {
+          title: ['h1', '#productTitle', '.product-title', '[data-testid="product-title"]'],
+          description: ['#productDescription', '.product-description', '#feature-bullets', '[itemprop="description"]'],
+          materials: ['[data-testid="materials"]', '.materials', '.composition', '.product-specs'],
+          certifications: ['.certifications', '[data-testid="certifications"]', '.eco-labels'],
+          category: ['.breadcrumb', 'meta[name="keywords"]', 'meta[name="description"]'],
+        };
+
+        const title = getText(selectors.title) || 'Unknown Product';
+        const description = getText(selectors.description) || '';
+        const materials = getText(selectors.materials) || '';
+        const certifications = getText(selectors.certifications) || '';
+        const category = getText(selectors.category) || '';
+
+        return { title, description, materials, certifications, category, raw: `${title}. ${description}. Materials: ${materials}. Certifications: ${certifications}.`.trim() };
+      });
+
+      // Infer category
+      const inferCategory = (text) => {
+        const lowerText = text.toLowerCase();
+        if (lowerText.includes('clothing') || lowerText.includes('shirt') || lowerText.includes('dress')) return 'Clothing';
+        if (lowerText.includes('electronics') || lowerText.includes('phone') || lowerText.includes('laptop')) return 'Electronics';
+        if (lowerText.includes('furniture') || lowerText.includes('table') || lowerText.includes('chair')) return 'Furniture';
+        if (lowerText.includes('food') || lowerText.includes('beverage') || lowerText.includes('organic')) return 'Food & Beverage';
+        return 'General';
+      };
+
+      data.category = inferCategory(`${data.title} ${data.description} ${data.category}`);
+      await browser.close();
+      return data;
+    } catch (error) {
+      console.error(`Puppeteer scraping error for ${url}:`, error.message);
+      return null;
+    } finally {
+      if (browser) await browser.close();
+    }
+  };
+
+  // Try Cheerio first, then Puppeteer if needed
+  for (let i = 0; i < retries; i++) {
+    let result = await scrapeWithCheerio();
+    if (result && result.raw) {
+      console.log(`Scraping successful for ${url} (Cheerio, attempt ${i + 1})`);
+      return result;
+    }
+
+    result = await scrapeWithPuppeteer();
+    if (result && result.raw) {
+      console.log(`Scraping successful for ${url} (Puppeteer, attempt ${i + 1})`);
+      return result;
+    }
+
+    if (i < retries - 1) {
+      console.log(`Retrying scraping for ${url} (attempt ${i + 2})`);
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
   }
+
+  console.error(`Scraping failed for ${url} after ${retries} attempts`);
+  return { title: 'Unknown Product', description: '', materials: '', certifications: '', category: 'General', raw: 'No data available.' };
 };
 
-// Helper to call Gemini API
 const callGeminiAPI = async (prompt) => {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${process.env.GEMINI_API_KEY}`;
   try {
-    const response = await axios.post(url, {
-      contents: [{ parts: [{ text: prompt }] }],
-    }, {
-      headers: { 'Content-Type': 'application/json' },
-    });
+    const response = await axios.post(
+      url,
+      { contents: [{ parts: [{ text: prompt }] }] },
+      { headers: { 'Content-Type': 'application/json' }, timeout: 15000 }
+    );
     return response.data.candidates[0].content.parts[0].text;
   } catch (error) {
-    console.error('Error calling Gemini API:', error.message);
+    console.error('Gemini API error:', error.message);
     throw new Error('Failed to analyze product with Gemini API');
   }
 };
 
-// Helper to parse Gemini API response
-function parseGeminiResponse(text, productInput) {
-  // Base structure for the report
+const parseGeminiResponse = (text, productInput, category) => {
   let report = {
     summary: '',
     sustainabilityScore: { value: null, max: 10 },
     impactMetrics: [],
     materialsImpact: [],
     lifecycleImpact: [],
+    certifications: [],
     ecoTip: '',
     aiInsight: '',
     aiDescriptions: {
@@ -68,16 +232,15 @@ function parseGeminiResponse(text, productInput) {
       impactMetrics: [],
       materialsImpact: '',
       lifecycleImpact: '',
+      certifications: '',
       ecoTip: '',
       aiInsight: '',
     },
   };
 
   try {
-    // Split the response into lines
     const lines = text.split('\n').map(line => line.trim()).filter(line => line);
 
-    // Helper to extract a number followed by a unit
     const extractMetric = (text, units, defaultMax) => {
       for (const unit of units) {
         const match = text.match(new RegExp(`~?(\\d+\\.?\\d*)\\s*${unit}`, 'i'));
@@ -86,7 +249,6 @@ function parseGeminiResponse(text, productInput) {
       return null;
     };
 
-    // Helper to extract percentage-based lists (e.g., materials)
     const extractPercentageList = text => {
       const items = text.matchAll(/(.*?)\s*\((\d+)%\)\s*-\s*(Low|High|Medium)\s*-\s*(.*?)(?=\n|$)/gi);
       return Array.from(items, match => ({
@@ -97,7 +259,6 @@ function parseGeminiResponse(text, productInput) {
       }));
     };
 
-    // Helper to extract lifecycle stages (e.g., Manufacturing: 40% - High)
     const extractLifecycleStages = text => {
       const items = text.matchAll(/(.*?):\s*(\d+)%\s*-\s*(Low|High|Medium)\s*-\s*(.*?)(?=\n|$)/gi);
       return Array.from(items, match => ({
@@ -108,34 +269,35 @@ function parseGeminiResponse(text, productInput) {
       }));
     };
 
-    // Helper to extract score (e.g., 7/10)
+    const extractCertifications = text => {
+      const items = text.matchAll(/(.*?)\s*-\s*(.*?)(?=\n|$)/gi);
+      return Array.from(items, match => ({
+        name: match[1].trim(),
+        description: match[2].trim(),
+      }));
+    };
+
     const extractScore = text => {
       const match = text.match(/(\d+)\/(\d+)/);
       if (match) return { value: parseInt(match[1]), max: parseInt(match[2]) };
       return null;
     };
 
-    // Parse each line based on expected labels with deduplication
     const seenMetrics = new Set();
     lines.forEach(line => {
       const lowerLine = line.toLowerCase();
 
-      // Summary
       if (lowerLine.includes('summary')) {
-        const summaryMatch = line.match(/Summary:\s*(.*)/i);
-        if (summaryMatch) report.summary = summaryMatch[1].trim();
+        const match = line.match(/Summary:\s*(.*)/i);
+        if (match) report.summary = match[1].trim();
       }
-
-      // Sustainability Score
       if (lowerLine.includes('sustainability score')) {
         const score = extractScore(line);
         if (score) report.sustainabilityScore = score;
       }
-
-      // Impact Metrics (Carbon Footprint, Water Usage, Energy Consumption) with deduplication
       if (lowerLine.includes('carbon footprint') || lowerLine.includes('co₂') || lowerLine.includes('emissions')) {
         if (!seenMetrics.has('Carbon Footprint')) {
-          const metric = extractMetric(line, ['kg CO₂e', 'kg CO2e', 'kg CO₂'], 50);
+          const metric = extractMetric(line, ['kg CO₂e', 'kg CO2e', 'kg CO₂'], category === 'Clothing' ? 30 : category === 'Electronics' ? 100 : 50);
           if (metric) {
             report.impactMetrics.push({ name: 'Carbon Footprint', ...metric });
             seenMetrics.add('Carbon Footprint');
@@ -144,7 +306,7 @@ function parseGeminiResponse(text, productInput) {
       }
       if (lowerLine.includes('water') && (lowerLine.includes('usage') || lowerLine.includes('consumption'))) {
         if (!seenMetrics.has('Water Usage')) {
-          const metric = extractMetric(line, ['liters', 'litres'], 2000);
+          const metric = extractMetric(line, ['liters', 'litres'], category === 'Clothing' ? 5000 : category === 'Food & Beverage' ? 1000 : 2000);
           if (metric) {
             report.impactMetrics.push({ name: 'Water Usage', ...metric });
             seenMetrics.add('Water Usage');
@@ -153,297 +315,315 @@ function parseGeminiResponse(text, productInput) {
       }
       if (lowerLine.includes('energy') && (lowerLine.includes('consumption') || lowerLine.includes('usage'))) {
         if (!seenMetrics.has('Energy Consumption')) {
-          const metric = extractMetric(line, ['kWh', 'kwh'], 100);
+          const metric = extractMetric(line, ['kWh', 'kwh'], category === 'Electronics' ? 200 : category === 'Furniture' ? 50 : 100);
           if (metric) {
             report.impactMetrics.push({ name: 'Energy Consumption', ...metric });
             seenMetrics.add('Energy Consumption');
           }
         }
       }
-
-      // Materials Impact
       if (lowerLine.includes('materials impact')) {
         const materials = extractPercentageList(line);
         if (materials.length > 0) report.materialsImpact = materials;
       }
-
-      // Lifecycle Impact
       if (lowerLine.includes('lifecycle impact')) {
         const lifecycle = extractLifecycleStages(line);
         if (lifecycle.length > 0) report.lifecycleImpact = lifecycle;
       }
-
-      // Eco Tip
+      if (lowerLine.includes('certifications')) {
+        const certs = extractCertifications(line);
+        if (certs.length > 0) report.certifications = certs;
+      }
       if (lowerLine.includes('eco tip')) {
-        const tipMatch = line.match(/Eco Tip:\s*(.*)/i);
-        if (tipMatch) report.ecoTip = tipMatch[1].trim();
+        const match = line.match(/Eco Tip:\s*(.*)/i);
+        if (match) report.ecoTip = match[1].trim();
       }
-
-      // AI Insight
       if (lowerLine.includes('ai insight')) {
-        const insightMatch = line.match(/AI Insight:\s*(.*)/i);
-        if (insightMatch) report.aiInsight = insightMatch[1].trim();
+        const match = line.match(/AI Insight:\s*(.*)/i);
+        if (match) report.aiInsight = match[1].trim();
       }
-
-      // AI Descriptions
       if (lowerLine.includes('description - sustainability score')) {
-        const descMatch = line.match(/Description - Sustainability Score:\s*(.*)/i);
-        if (descMatch) report.aiDescriptions.sustainabilityScore = descMatch[1].trim();
+        const match = line.match(/Description - Sustainability Score:\s*(.*)/i);
+        if (match) report.aiDescriptions.sustainabilityScore = match[1].trim();
       }
-      if (lowerLine.includes('description - carbon footprint') || lowerLine.includes('description - co₂') || lowerLine.includes('description - emissions')) {
-        const descMatch = line.match(/Description - Carbon Footprint:\s*(.*)/i);
-        if (descMatch) report.aiDescriptions.impactMetrics.push({ name: 'Carbon Footprint', description: descMatch[1].trim() });
+      if (lowerLine.includes('description - carbon footprint')) {
+        const match = line.match(/Description - Carbon Footprint:\s*(.*)/i);
+        if (match) report.aiDescriptions.impactMetrics.push({ name: 'Carbon Footprint', description: match[1].trim() });
       }
-      if (lowerLine.includes('description - water') && (lowerLine.includes('usage') || lowerLine.includes('consumption'))) {
-        const descMatch = line.match(/Description - Water Usage:\s*(.*)/i);
-        if (descMatch) report.aiDescriptions.impactMetrics.push({ name: 'Water Usage', description: descMatch[1].trim() });
+      if (lowerLine.includes('description - water usage')) {
+        const match = line.match(/Description - Water Usage:\s*(.*)/i);
+        if (match) report.aiDescriptions.impactMetrics.push({ name: 'Water Usage', description: match[1].trim() });
       }
-      if (lowerLine.includes('description - energy') && (lowerLine.includes('consumption') || lowerLine.includes('usage'))) {
-        const descMatch = line.match(/Description - Energy Consumption:\s*(.*)/i);
-        if (descMatch) report.aiDescriptions.impactMetrics.push({ name: 'Energy Consumption', description: descMatch[1].trim() });
+      if (lowerLine.includes('description - energy consumption')) {
+        const match = line.match(/Description - Energy Consumption:\s*(.*)/i);
+        if (match) report.aiDescriptions.impactMetrics.push({ name: 'Energy Consumption', description: match[1].trim() });
       }
       if (lowerLine.includes('description - materials impact')) {
-        const descMatch = line.match(/Description - Materials Impact:\s*(.*)/i);
-        if (descMatch) report.aiDescriptions.materialsImpact = descMatch[1].trim();
+        const match = line.match(/Description - Materials Impact:\s*(.*)/i);
+        if (match) report.aiDescriptions.materialsImpact = match[1].trim();
       }
       if (lowerLine.includes('description - lifecycle impact')) {
-        const descMatch = line.match(/Description - Lifecycle Impact:\s*(.*)/i);
-        if (descMatch) report.aiDescriptions.lifecycleImpact = descMatch[1].trim();
+        const match = line.match(/Description - Lifecycle Impact:\s*(.*)/i);
+        if (match) report.aiDescriptions.lifecycleImpact = match[1].trim();
+      }
+      if (lowerLine.includes('description - certifications')) {
+        const match = line.match(/Description - Certifications:\s*(.*)/i);
+        if (match) report.aiDescriptions.certifications = match[1].trim();
       }
       if (lowerLine.includes('description - eco tip')) {
-        const descMatch = line.match(/Description - Eco Tip:\s*(.*)/i);
-        if (descMatch) report.aiDescriptions.ecoTip = descMatch[1].trim();
+        const match = line.match(/Description - Eco Tip:\s*(.*)/i);
+        if (match) report.aiDescriptions.ecoTip = match[1].trim();
       }
       if (lowerLine.includes('description - ai insight')) {
-        const descMatch = line.match(/Description - AI Insight:\s*(.*)/i);
-        if (descMatch) report.aiDescriptions.aiInsight = descMatch[1].trim();
+        const match = line.match(/Description - AI Insight:\s*(.*)/i);
+        if (match) report.aiDescriptions.aiInsight = match[1].trim();
       }
     });
 
-    // Fallbacks if data is missing
+    // Ensure standardized lifecycle stages
+    const standardStages = ['Sourcing', 'Manufacturing', 'Usage', 'Disposal'];
+    const existingStages = report.lifecycleImpact.map(s => s.stage);
+    const missingStages = standardStages.filter(s => !existingStages.includes(s));
+    missingStages.forEach(stage => {
+      report.lifecycleImpact.push({
+        stage,
+        percentage: 25,
+        impact: 'Medium',
+        description: `Assumed ${stage.toLowerCase()} impact based on ${category} industry norms.`,
+      });
+    });
+
+    // Fallbacks
     if (!report.summary) {
-      report.summary = `Your ${productInput} has a ${
+      report.summary = `The ${productInput} has a ${
         report.sustainabilityScore.value >= 7 ? 'low' : report.sustainabilityScore.value >= 4 ? 'moderate' : 'high'
-      } environmental impact. Here’s how to improve it.`;
+      } environmental impact based on ${category} standards.`;
     }
     if (!report.sustainabilityScore.value) {
-      report.sustainabilityScore.value = 5; // Default to average
+      report.sustainabilityScore = { value: category === 'Clothing' ? 6 : category === 'Electronics' ? 4 : 5, max: 10 };
     }
     if (report.impactMetrics.length === 0) {
-      report.impactMetrics.push({ name: 'Carbon Footprint', value: 10, unit: 'kg CO₂e', max: 50 });
+      report.impactMetrics.push({ name: 'Carbon Footprint', value: category === 'Clothing' ? 15 : 25, unit: 'kg CO₂e', max: category === 'Clothing' ? 30 : 50 });
     }
     if (report.materialsImpact.length === 0) {
-      report.materialsImpact.push({ 
-        name: 'Unknown Material', 
-        percentage: 100, 
+      report.materialsImpact.push({
+        name: 'Unknown Material',
+        percentage: 100,
         impact: 'Medium',
-        description: 'Material data unavailable; consider researching product composition.'
+        description: `Material data unavailable; assumed based on ${category} products.`,
       });
     }
-    if (report.lifecycleImpact.length === 0) {
-      report.lifecycleImpact.push(
-        { stage: 'Manufacturing', percentage: 50, impact: 'Medium', description: 'Moderate energy use during production.' },
-        { stage: 'Usage', percentage: 30, impact: 'Low', description: 'Low energy consumption during use.' },
-        { stage: 'Disposal', percentage: 20, impact: 'High', description: 'Challenging to recycle.' }
-      );
+    if (report.certifications.length === 0) {
+      report.certifications.push({
+        name: 'None Identified',
+        description: `No eco-certifications found for this ${category} product.`,
+      });
     }
     if (!report.ecoTip) {
-      report.ecoTip = 'Use sustainably to reduce impact.';
+      report.ecoTip = category === 'Clothing' ? 'Wash in cold water to save energy.' : 'Choose energy-efficient usage to reduce impact.';
     }
     if (!report.aiInsight) {
-      report.aiInsight = 'Reduce usage to lower environmental impact.';
+      report.aiInsight = category === 'Electronics' ? 'Opt for recyclable components to enhance sustainability.' : 'Explore sustainable sourcing to reduce impact.';
     }
-    // Fallbacks for AI Descriptions
     if (!report.aiDescriptions.sustainabilityScore) {
-      report.aiDescriptions.sustainabilityScore = 'A glowing badge of your product’s green heart!';
+      report.aiDescriptions.sustainabilityScore = `A measure of eco-friendliness for this ${category} product.`;
     }
     if (report.aiDescriptions.impactMetrics.length === 0) {
-      report.aiDescriptions.impactMetrics.push({ 
-        name: 'Carbon Footprint', 
-        description: 'Like a weekend road trip’s carbon trail!' 
+      report.aiDescriptions.impactMetrics.push({
+        name: 'Carbon Footprint',
+        description: `The carbon footprint of this ${category} product’s lifecycle.`,
       });
     }
     if (!report.aiDescriptions.materialsImpact) {
-      report.aiDescriptions.materialsImpact = 'The building blocks of your product’s eco-story.';
+      report.aiDescriptions.materialsImpact = `The environmental impact of materials in this ${category} product.`;
     }
     if (!report.aiDescriptions.lifecycleImpact) {
-      report.aiDescriptions.lifecycleImpact = 'A journey through your product’s eco-life stages.';
+      report.aiDescriptions.lifecycleImpact = `The lifecycle impact across this ${category} product’s stages.`;
+    }
+    if (!report.aiDescriptions.certifications) {
+      report.aiDescriptions.certifications = `Eco-credentials for this ${category} product.`;
     }
     if (!report.aiDescriptions.ecoTip) {
-      report.aiDescriptions.ecoTip = 'A whisper of wisdom for a greener tomorrow.';
+      report.aiDescriptions.ecoTip = `A practical step for sustainable use of this ${category} product.`;
     }
     if (!report.aiDescriptions.aiInsight) {
-      report.aiDescriptions.aiInsight = 'A spark of genius to lighten your eco-load.';
+      report.aiDescriptions.aiInsight = `Strategic advice for improving this ${category} product’s sustainability.`;
     }
-
   } catch (error) {
-    console.error('Error parsing Gemini response:', error.message);
-    report.summary = `Your ${productInput} has an unknown environmental impact.`;
-    report.sustainabilityScore = { value: 5, max: 10 };
-    report.impactMetrics = [{ name: 'Carbon Footprint', value: 10, unit: 'kg CO₂e', max: 50 }];
-    report.materialsImpact = [{ 
-      name: 'Unknown Material', 
-      percentage: 100, 
-      impact: 'Medium',
-      description: 'Material data unavailable; consider researching product composition.'
-    }];
-    report.lifecycleImpact = [
-      { stage: 'Manufacturing', percentage: 50, impact: 'Medium', description: 'Moderate energy use during production.' },
-      { stage: 'Usage', percentage: 30, impact: 'Low', description: 'Low energy consumption during use.' },
-      { stage: 'Disposal', percentage: 20, impact: 'High', description: 'Challenging to recycle.' }
-    ];
-    report.ecoTip = 'Use sustainably to reduce impact.';
-    report.aiInsight = 'Analysis unavailable due to parsing error.';
-    report.aiDescriptions = {
-      sustainabilityScore: 'A glowing badge of your product’s green heart!',
-      impactMetrics: [{ name: 'Carbon Footprint', description: 'Like a weekend road trip’s carbon trail!' }],
-      materialsImpact: 'The building blocks of your product’s eco-story.',
-      lifecycleImpact: 'A journey through your product’s eco-life stages.',
-      ecoTip: 'A whisper of wisdom for a greener tomorrow.',
-      aiInsight: 'A spark of genius to lighten your eco-load.',
+    console.error('Parsing error:', error.message);
+    report = {
+      summary: `The ${productInput} has an unknown environmental impact in the ${category} category.`,
+      sustainabilityScore: { value: 5, max: 10 },
+      impactMetrics: [{ name: 'Carbon Footprint', value: 25, unit: 'kg CO₂e', max: 50 }],
+      materialsImpact: [{
+        name: 'Unknown Material',
+        percentage: 100,
+        impact: 'Medium',
+        description: 'Material data unavailable.',
+      }],
+      lifecycleImpact: [
+        { stage: 'Sourcing', percentage: 25, impact: 'Medium', description: 'Assumed sourcing impact.' },
+        { stage: 'Manufacturing', percentage: 25, impact: 'Medium', description: 'Assumed manufacturing impact.' },
+        { stage: 'Usage', percentage: 25, impact: 'Low', description: 'Assumed low usage impact.' },
+        { stage: 'Disposal', percentage: 25, impact: 'High', description: 'Assumed disposal impact.' },
+      ],
+      certifications: [{ name: 'None Identified', description: 'No eco-certifications found.' }],
+      ecoTip: 'Choose reusable alternatives to reduce impact.',
+      aiInsight: 'Explore sustainable sourcing options.',
+      aiDescriptions: {
+        sustainabilityScore: 'A snapshot of your product’s eco-credentials.',
+        impactMetrics: [{ name: 'Carbon Footprint', description: 'The carbon trail of your product’s journey.' }],
+        materialsImpact: 'The eco-story behind your product’s materials.',
+        lifecycleImpact: 'The environmental journey of your product.',
+        certifications: 'Badges of your product’s eco-credentials.',
+        ecoTip: 'A practical step toward a greener future.',
+        aiInsight: 'Smart insights for sustainable choices.',
+      },
     };
   }
-
   return report;
-}
+};
 
-// Route to analyze product
 app.post('/api/analyze', async (req, res) => {
   const { productLink, productDescription } = req.body;
 
-  // Validate input
   if (!productLink && !productDescription) {
-    console.log('Validation failed: No product link or description provided');
     return res.status(400).json({ error: 'Please provide a product link or description' });
   }
 
   try {
-    console.log('Received request:', { productLink, productDescription });
-
-    // Check in-memory cache
     const cacheKey = JSON.stringify({ productLink, productDescription });
     const cachedResult = cache.get(cacheKey);
     if (cachedResult && (Date.now() - cachedResult.timestamp < CACHE_DURATION)) {
-      console.log('Returning cached result');
       return res.json(cachedResult.report);
     }
 
-    // Prepare the prompt for Gemini API
     let promptInput = productDescription || '';
     let productName = productDescription || 'product';
+    let category = 'General';
 
-    // Scrape product details if a URL is provided
     if (productLink) {
-      console.log('Scraping product details from URL:', productLink);
       const scrapedData = await scrapeProductDetails(productLink);
-      if (scrapedData) {
-        promptInput = scrapedData;
-        productName = scrapedData.split('.')[0] || 'product';
-        console.log('Scraped data:', scrapedData);
+      if (scrapedData.raw) {
+        promptInput = scrapedData.raw;
+        productName = scrapedData.title;
+        category = scrapedData.category;
       } else {
-        console.log('Failed to scrape product details');
         return res.status(400).json({ error: 'Failed to scrape product details from the provided URL' });
       }
+    } else if (productDescription) {
+      // Infer category from description
+      const inferCategory = (text) => {
+        const lowerText = text.toLowerCase();
+        if (lowerText.includes('clothing') || lowerText.includes('shirt') || lowerText.includes('dress')) return 'Clothing';
+        if (lowerText.includes('electronics') || lowerText.includes('phone') || lowerText.includes('laptop')) return 'Electronics';
+        if (lowerText.includes('furniture') || lowerText.includes('table') || lowerText.includes('chair')) return 'Furniture';
+        if (lowerText.includes('food') || lowerText.includes('beverage') || lowerText.includes('organic')) return 'Food & Beverage';
+        return 'General';
+      };
+      category = inferCategory(productDescription);
     }
 
-    // Construct the prompt for Gemini API (concise, no markdown)
     const prompt = `
-      Analyze the environmental impact of this product: ${promptInput}.
-      Provide a concise report in plain text with the following sections (keep each response to 1-2 short sentences, no markdown like ** or *):
-      Summary: A one-sentence summary of the product's environmental impact.
-      Sustainability Score: A score out of 10 (e.g., 7/10).
-      Carbon Footprint: Estimated carbon footprint in kg CO₂e (e.g., 20 kg CO₂e).
-      Water Usage: Estimated water usage in liters (e.g., 1500 liters).
-      Materials Impact: List of materials with percentages, impact, and a short description (e.g., Recycled Aluminum (75%) - Low - Sourced sustainably, Plastic (25%) - High - Non-biodegradable).
-      Lifecycle Impact: List of lifecycle stages with percentages, impact, and a short description (e.g., Manufacturing: 40% - High - Energy-intensive, Usage: 30% - Low - Minimal energy use, Disposal: 30% - Medium - Partially recyclable).
-      Eco Tip: A one-sentence eco tip.
-      AI Insight: A one-sentence actionable insight for reducing impact.
-      Description - Sustainability Score: A creative one-sentence description of what the sustainability score means.
-      Description - Carbon Footprint: A creative one-sentence description of the carbon footprint.
-      Description - Water Usage: A creative one-sentence description of the water usage.
-      Description - Materials Impact: A creative one-sentence description of the materials impact.
-      Description - Lifecycle Impact: A creative one-sentence description of the lifecycle impact.
-      Description - Eco Tip: A creative one-sentence description of the eco tip.
-      Description - AI Insight: A creative one-sentence description of the AI insight.
+      Analyze the environmental impact of this ${category} product: ${promptInput}.
+      Provide a concise, accurate report based on industry standards or scientific data where possible.
+      If data is missing, use conservative estimates based on typical ${category} products and indicate assumptions (e.g., "Assumed based on industry averages").
+      Avoid speculative or unverified claims.
+      Return the response in plain text with the following sections, using exact formats:
+      Summary: [1-2 sentences summarizing the product's environmental impact]
+      Sustainability Score: [X/10, e.g., 7/10]
+      Carbon Footprint: [X kg CO₂e, e.g., 20 kg CO₂e]
+      Water Usage: [X liters, e.g., 1500 liters]
+      Energy Consumption: [X kWh, e.g., 50 kWh]
+      Materials Impact: [List materials, e.g., Recycled Cotton (60%) - Low - Sustainably sourced, Plastic (40%) - High - Non-biodegradable]
+      Lifecycle Impact: [List stages, e.g., Sourcing: 20% - Medium - Moderate resource use, Manufacturing: 30% - High - Energy-intensive]
+      Certifications: [List certifications, e.g., Fair Trade - Ensures ethical labor practices, Organic - Certified organic materials]
+      Eco Tip: [Practical user action, e.g., Wash in cold water to save energy]
+      AI Insight: [Strategic suggestion, e.g., Switch to biodegradable packaging]
+      Description - Sustainability Score: [Creative 1-sentence description]
+      Description - Carbon Footprint: [Creative 1-sentence description]
+      Description - Water Usage: [Creative 1-sentence description]
+      Description - Energy Consumption: [Creative 1-sentence description]
+      Description - Materials Impact: [Creative 1-sentence description]
+      Description - Lifecycle Impact: [Creative 1-sentence description]
+      Description - Certifications: [Creative 1-sentence description]
+      Description - Eco Tip: [Creative 1-sentence description]
+      Description - AI Insight: [Creative 1-sentence description]
     `;
 
-    // Call Gemini API
-    console.log('Calling Gemini API with prompt:', prompt.substring(0, 100) + '...');
     let geminiResponse;
     try {
       geminiResponse = await callGeminiAPI(prompt);
     } catch (error) {
-      console.error('Gemini API failed:', error.message);
+      console.error('Gemini API failed, using fallback');
       return res.json({
-        summary: `Your ${productName} has an unknown environmental impact.`,
+        summary: `The ${productName} has an unknown environmental impact in the ${category} category.`,
         sustainabilityScore: { value: 5, max: 10 },
-        impactMetrics: [{ name: 'Carbon Footprint', value: 10, unit: 'kg CO₂e', max: 50 }],
-        materialsImpact: [{ 
-          name: 'Unknown Material', 
-          percentage: 100, 
+        impactMetrics: [{ name: 'Carbon Footprint', value: 25, unit: 'kg CO₂e', max: 50 }],
+        materialsImpact: [{
+          name: 'Unknown Material',
+          percentage: 100,
           impact: 'Medium',
-          description: 'Material data unavailable; consider researching product composition.'
+          description: 'Material data unavailable.',
         }],
         lifecycleImpact: [
-          { stage: 'Manufacturing', percentage: 50, impact: 'Medium', description: 'Moderate energy use during production.' },
-          { stage: 'Usage', percentage: 30, impact: 'Low', description: 'Low energy consumption during use.' },
-          { stage: 'Disposal', percentage: 20, impact: 'High', description: 'Challenging to recycle.' }
+          { stage: 'Sourcing', percentage: 25, impact: 'Medium', description: 'Assumed sourcing impact.' },
+          { stage: 'Manufacturing', percentage: 25, impact: 'Medium', description: 'Assumed manufacturing impact.' },
+          { stage: 'Usage', percentage: 25, impact: 'Low', description: 'Assumed low usage impact.' },
+          { stage: 'Disposal', percentage: 25, impact: 'High', description: 'Assumed disposal impact.' },
         ],
-        ecoTip: 'Use sustainably to reduce impact.',
-        aiInsight: 'Analysis unavailable due to API error.',
+        certifications: [{ name: 'None Identified', description: 'No eco-certifications found.' }],
+        ecoTip: 'Choose reusable alternatives to reduce impact.',
+        aiInsight: 'Explore sustainable sourcing options.',
         aiDescriptions: {
-          sustainabilityScore: 'A glowing badge of your product’s green heart!',
-          impactMetrics: [{ name: 'Carbon Footprint', description: 'Like a weekend road trip’s carbon trail!' }],
-          materialsImpact: 'The building blocks of your product’s eco-story.',
-          lifecycleImpact: 'A journey through your product’s eco-life stages.',
-          ecoTip: 'A whisper of wisdom for a greener tomorrow.',
-          aiInsight: 'A spark of genius to lighten your eco-load.',
+          sustainabilityScore: 'A snapshot of your product’s eco-credentials.',
+          impactMetrics: [{ name: 'Carbon Footprint', description: 'The carbon trail of your product’s journey.' }],
+          materialsImpact: 'The eco-story behind your product’s materials.',
+          lifecycleImpact: 'The environmental journey of your product.',
+          certifications: 'Badges of your product’s eco-credentials.',
+          ecoTip: 'A practical step toward a greener future.',
+          aiInsight: 'Smart insights for sustainable choices.',
         },
       });
     }
-    console.log('Gemini API response:', geminiResponse);
 
-    // Parse the response
-    console.log('Parsing Gemini response');
-    const report = parseGeminiResponse(geminiResponse, productName);
-    console.log('Parsed report:', JSON.stringify(report, null, 2));
-
-    // Store in cache
+    const report = parseGeminiResponse(geminiResponse, productName, category);
     cache.set(cacheKey, { report, timestamp: Date.now() });
-
     res.json(report);
   } catch (error) {
-    console.error('Error in /api/analyze:', error.message, error.stack);
+    console.error('Error in /api/analyze:', error.message);
     res.status(500).json({
       summary: 'An unexpected error occurred.',
       sustainabilityScore: { value: 5, max: 10 },
-      impactMetrics: [{ name: 'Carbon Footprint', value: 10, unit: 'kg CO₂e', max: 50 }],
-      materialsImpact: [{ 
-        name: 'Unknown Material', 
-        percentage: 100, 
+      impactMetrics: [{ name: 'Carbon Footprint', value: 25, unit: 'kg CO₂e', max: 50 }],
+      materialsImpact: [{
+        name: 'Unknown Material',
+        percentage: 100,
         impact: 'Medium',
-        description: 'Material data unavailable; consider researching product composition.'
+        description: 'Material data unavailable.',
       }],
       lifecycleImpact: [
-        { stage: 'Manufacturing', percentage: 50, impact: 'Medium', description: 'Moderate energy use during production.' },
-        { stage: 'Usage', percentage: 30, impact: 'Low', description: 'Low energy consumption during use.' },
-        { stage: 'Disposal', percentage: 20, impact: 'High', description: 'Challenging to recycle.' }
+        { stage: 'Sourcing', percentage: 25, impact: 'Medium', description: 'Assumed sourcing impact.' },
+        { stage: 'Manufacturing', percentage: 25, impact: 'Medium', description: 'Assumed manufacturing impact.' },
+        { stage: 'Usage', percentage: 25, impact: 'Low', description: 'Assumed low usage impact.' },
+        { stage: 'Disposal', percentage: 25, impact: 'High', description: 'Assumed disposal impact.' },
       ],
-      ecoTip: 'Use sustainably to reduce impact.',
-      aiInsight: 'Analysis unavailable due to server error.',
+      certifications: [{ name: 'None Identified', description: 'No eco-certifications found.' }],
+      ecoTip: 'Choose reusable alternatives to reduce impact.',
+      aiInsight: 'Explore sustainable sourcing options.',
       aiDescriptions: {
-        sustainabilityScore: 'A glowing badge of your product’s green heart!',
-        impactMetrics: [{ name: 'Carbon Footprint', description: 'Like a weekend road trip’s carbon trail!' }],
-        materialsImpact: 'The building blocks of your product’s eco-story.',
-        lifecycleImpact: 'A journey through your product’s eco-life stages.',
-        ecoTip: 'A whisper of wisdom for a greener tomorrow.',
-        aiInsight: 'A spark of genius to lighten your eco-load.',
+        sustainabilityScore: 'A snapshot of your product’s eco-credentials.',
+        impactMetrics: [{ name: 'Carbon Footprint', description: 'The carbon trail of your product’s journey.' }],
+        materialsImpact: 'The eco-story behind your product’s materials.',
+        lifecycleImpact: 'The environmental journey of your product.',
+        certifications: 'Badges of your product’s eco-credentials.',
+        ecoTip: 'A practical step toward a greener future.',
+        aiInsight: 'Smart insights for sustainable choices.',
       },
     });
   }
 });
 
-// Start the server
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });

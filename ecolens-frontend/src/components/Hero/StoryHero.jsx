@@ -2,15 +2,31 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Navbar from '../Navbar/Navbar';
 import heroImage from '../../assets/hero.png';
 import { useState } from 'react';
-import { FaLeaf, FaCheck, FaRecycle, FaWater, FaBolt, FaChartPie, FaLightbulb, FaCogs } from 'react-icons/fa';
+import { FaLeaf, FaCheck, FaRecycle, FaWater, FaBolt, FaChartPie, FaLightbulb, FaCogs, FaCertificate } from 'react-icons/fa';
 import axios from 'axios';
+
+const ReportCard = ({ title, icon, children, delay }) => (
+  <motion.div
+    className="p-4 bg-[#f0f5f0]/90 rounded-lg shadow-md border border-[#88a978]/30 hover:shadow-lg transition-shadow duration-300"
+    initial={{ opacity: 0, y: 20 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ duration: 0.5, delay }}
+  >
+    <div className="flex items-center gap-2 mb-3">
+      {icon}
+      <h3 className="text-lg font-inter font-semibold text-[#1a2c1a]">{title}</h3>
+    </div>
+    {children}
+  </motion.div>
+);
 
 const StoryHero = () => {
   const [isFormVisible, setIsFormVisible] = useState(false);
-  const [formMode, setFormMode] = useState('url'); // 'url' or 'description'
-  const [report, setReport] = useState(null); // Store AI-generated report data
-  const [error, setError] = useState(null); // Store validation errors
-  const [savedTip, setSavedTip] = useState(false); // Track if eco tip is saved
+  const [formMode, setFormMode] = useState('url');
+  const [report, setReport] = useState(null);
+  const [error, setError] = useState(null);
+  const [savedTip, setSavedTip] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const headlineWords = [
     { text: 'Uncover', color: '#1a2c1a' },
@@ -34,6 +50,7 @@ const StoryHero = () => {
 
   const handleCloseClick = () => {
     setIsFormVisible(false);
+    setError(null);
   };
 
   const handleSubmit = async (e) => {
@@ -41,40 +58,38 @@ const StoryHero = () => {
     const formData = new FormData(e.target);
     const input = formMode === 'url' ? formData.get('productLink') : formData.get('productDescription');
 
-    // Basic validation
     if (!input || input.trim() === '') {
       setError(formMode === 'url' ? 'Please enter a valid URL' : 'Please enter a product description');
       return;
     }
-    if (formMode === 'url' && !input.startsWith('http')) {
+    if (formMode === 'url' && !/^https?:\/\//i.test(input)) {
       setError('Please enter a valid URL starting with http:// or https://');
       return;
     }
 
     setError(null);
+    setIsLoading(true);
     try {
       const response = await axios.post('http://localhost:5000/api/analyze', {
         productLink: formMode === 'url' ? input : '',
         productDescription: formMode === 'description' ? input : '',
       });
-      console.log('API Response:', response.data); // Debug log
       setReport(response.data);
       setIsFormVisible(false);
     } catch (err) {
-      console.error('API Error:', err); // Debug log
       setError(err.response?.data?.error || 'Failed to analyze the product. Please try again.');
-      setReport(null); // Reset report on error
+      setReport(null);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  // Helper to determine environment impact
   const getEnvironmentImpact = (score) => {
-    if (score >= 7) return { label: 'Good for Environment', color: '#88a978' };
-    if (score <= 3) return { label: 'Bad for Environment', color: '#f4a261' };
-    return { label: 'Moderate for Environment', color: '#d4b83e' };
+    if (score >= 7) return { label: 'Eco-Friendly', color: '#88a978' };
+    if (score <= 3) return { label: 'High Impact', color: '#f4a261' };
+    return { label: 'Moderate Impact', color: '#d4b83e' };
   };
 
-  // Fallback UI for when report is invalid
   const renderErrorState = () => (
     <div className="text-center p-6 bg-[#f4a261]/20 rounded-lg">
       <p className="text-[#f4a261] text-lg font-inter">
@@ -89,32 +104,53 @@ const StoryHero = () => {
           setIsFormVisible(true);
           setSavedTip(false);
         }}
-        className="mt-4 px-6 py-2 bg-[#506850] text-[#f0f5f0] font-inter font-medium text-base rounded-sm hover:bg-[#88a978] transition-all duration-300"
+        className="mt-4 px-6 py-2 bg-[#506850] text-[#f0f5f0] font-inter font-medium rounded-sm hover:bg-[#88a978] transition-all duration-300"
       >
         Try Again
       </button>
     </div>
   );
 
+  const renderCircularProgress = (value, max, color = '#88a978') => (
+    <div className="relative w-20 h-20 mx-auto">
+      <svg className="w-full h-full" viewBox="0 0 36 36">
+        <path
+          d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+          fill="none"
+          stroke="#e0e0e0"
+          strokeWidth="3"
+        />
+        <path
+          d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+          fill="none"
+          stroke={color}
+          strokeWidth="3"
+          strokeDasharray={`${(value / max) * 100}, 100`}
+        />
+      </svg>
+      <div className="absolute inset-0 flex items-center justify-center">
+        <span className="text-sm font-inter text-[#1a2c1a]">{Math.round((value / max) * 100)}%</span>
+      </div>
+    </div>
+  );
+
   return (
-    <section id="home" className="relative bg-gradient-to-b from-[#d9e2d9] to-[#506850]/40 flex flex-col overflow-hidden">
-      {/* Navbar */}
+    <section id="home" className="relative bg-gradient-to-b from-[#e8f0e8] to-[#506850]/30 flex flex-col min-h-screen overflow-hidden">
       <Navbar />
-      {/* Background Leaves */}
       <div className="absolute inset-0 pointer-events-none">
-        {[...Array(100)].map((_, i) => (
+        {[...Array(50)].map((_, i) => (
           <svg
             key={i}
-            className="absolute text-[#506850]/80"
+            className="absolute text-[#506850]/60"
             style={{
-              width: `30px`,
-              height: `30px`,
-              top: `${Math.random() * 50}%`,
+              width: `25px`,
+              height: `25px`,
+              top: `${Math.random() * 60}%`,
               left: `${Math.random() * 100}%`,
-              animation: `fall 20s ease-in-out infinite`,
-              animationDelay: `${Math.random() * 10}s`,
+              animation: `fall 25s ease-in-out infinite`,
+              animationDelay: `${Math.random() * 12}s`,
               transform: `rotate(${Math.random() * 360}deg)`,
-              opacity: `0.5`,
+              opacity: `0.4`,
             }}
             viewBox="0 0 24 24"
             fill="currentColor"
@@ -123,19 +159,16 @@ const StoryHero = () => {
           </svg>
         ))}
       </div>
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col px-10 md:px-24 py-10">
-        {/* Text and Image Row */}
-        <div className="flex flex-col md:flex-row items-center justify-between">
-          {/* Text Container */}
+      <div className="flex-1 flex flex-col px-6 md:px-16 py-12">
+        <div className="flex flex-col md:flex-row items-center justify-between gap-8">
           <div className="relative z-10 w-full md:w-1/2 flex flex-col justify-center gap-6">
             <motion.h1
-              className="text-4xl md:text-5xl font-inter font-bold leading-tight tracking-tight flex flex-wrap gap-2"
+              className="text-3xl md:text-5xl font-inter font-bold leading-tight tracking-tight flex flex-wrap gap-2"
             >
               {headlineWords.map((word, index) => (
                 <motion.span
                   key={index}
-                  style={{ color: word.color }} // Use inline style instead of Tailwind class
+                  style={{ color: word.color }}
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ duration: 0.6, ease: 'easeOut', delay: index * 0.1 }}
@@ -144,7 +177,6 @@ const StoryHero = () => {
                 </motion.span>
               ))}
             </motion.h1>
-            {/* Subheadline */}
             <motion.p
               className="text-lg md:text-xl font-inter text-[#2f3b2f] max-w-md"
               initial={{ opacity: 0, y: 20 }}
@@ -153,66 +185,60 @@ const StoryHero = () => {
             >
               Discover Sustainable Insights with Ease.
             </motion.p>
-            {/* CTA Button */}
             <motion.button
               onClick={handleGetStartedClick}
-              className="mt-4 w-[128px] h-[44px] bg-transparent text-[#3b5f3b] font-inter font-medium text-sm rounded-sm border border-[#3b5f3b] hover:bg-[#6e8f6e] hover:text-[#f0f5f0] hover:border-[#6e8f6e] focus:outline-none focus:ring-2 focus:ring-[#6e8f6e]/40"
+              className="mt-4 w-36 px-6 py-3 bg-[#506850] text-[#f0f5f0] font-inter font-medium text-base rounded-md hover:bg-[#88a978] transition-all duration-300"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, ease: 'easeOut', delay: 1.0 }}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
             >
               Get Started
             </motion.button>
           </div>
-          {/* Image (Right Side) */}
           <div className="hidden md:flex w-1/2 h-full items-center justify-end">
             <motion.img
               src={heroImage}
               alt="EcoLens Hero"
-              className="w-4/5 h-auto object-contain"
+              className="w-3/4 h-auto object-contain"
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.8, ease: 'easeOut', delay: 0.4 }}
             />
           </div>
         </div>
-        {/* Input Form (Appears First) */}
         <AnimatePresence>
           {isFormVisible && (
             <motion.div
-              className="mt-6 flex justify-center"
+              className="mt-8 flex justify-center"
               initial={{ opacity: 0, y: 40 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 40 }}
               transition={{ duration: 0.6, ease: 'easeOut' }}
             >
-              <div className="relative w-full max-w-2xl p-10 bg-[#506850]/30 bg-gradient-to-b from-[#e8f0e8]/80 to-[#6e8f6e]/40 backdrop-blur-md border border-[#6e8f6e]/40 rounded-lg shadow-sm flex flex-col gap-6">
-                {/* Close Button */}
+              <div className="relative w-full max-w-2xl p-8 bg-[#f0f5f0]/95 backdrop-blur-sm rounded-lg shadow-lg border border-[#88a978]/40 flex flex-col gap-6">
                 <motion.button
                   onClick={handleCloseClick}
-                  className="absolute top-4 right-4 w-8 h-8 bg-[#506850] text-[#f0f5f0] font-inter font-medium text-lg rounded-full flex items-center justify-center hover:bg-[#88a978] focus:outline-none focus:ring-2 focus:ring-[#88a978]/40 transition-all duration-300"
+                  className="absolute top-4 right-4 w-8 h-8 bg-[#506850] text-[#f0f5f0] rounded-full flex items-center justify-center hover:bg-[#88a978] transition-all duration-300"
                   whileHover={{ scale: 1.1 }}
                   whileTap={{ scale: 0.9 }}
                 >
                   ×
                 </motion.button>
-                {/* Title and Description */}
                 <motion.div
                   className="text-center"
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.5, ease: 'easeOut', delay: 0.1 }}
                 >
-                  <h2 className="text-3xl font-inter font-bold text-[#1a2c1a] tracking-wide">
-                    EcoLens
+                  <h2 className="text-2xl font-inter font-bold text-[#1a2c1a] tracking-wide">
+                    EcoLens Analysis
                   </h2>
-                  <p className="text-base font-inter text-[#2f3b2f] mt-1 leading-relaxed">
+                  <p className="text-base font-inter text-[#2f3b2f] mt-1">
                     Enter a product URL or description to uncover its eco-impact.
                   </p>
                 </motion.div>
-                {/* Slider Toggle */}
                 <motion.div
                   className="relative flex justify-center"
                   initial={{ opacity: 0, y: 20 }}
@@ -220,18 +246,15 @@ const StoryHero = () => {
                   transition={{ duration: 0.5, ease: 'easeOut', delay: 0.2 }}
                 >
                   <div className="relative w-64 bg-[#e8f0e8]/80 border border-[#3b5f3b]/50 rounded-full flex items-center justify-between p-1">
-                    {/* Sliding Background */}
                     <motion.div
-                      className="absolute top-1 bottom-1 w-1/2 bg-[#506850] rounded-full shadow-sm shadow-[#6e8f6e]/40"
-                      initial={false}
+                      className="absolute top-1 bottom-1 w-1/2 bg-[#506850] rounded-full shadow-sm"
                       animate={{ x: formMode === 'url' ? 0 : '100%' }}
                       transition={{ duration: 0.3, ease: 'easeInOut' }}
                     />
-                    {/* Toggle Options */}
                     <button
                       type="button"
                       onClick={() => setFormMode('url')}
-                      className={`relative z-10 w-1/2 text-sm font-inter font-medium py-1.5 rounded-full transition-colors duration-300 ${
+                      className={`relative z-10 w-1/2 text-sm font-inter font-medium py-1.5 rounded-full ${
                         formMode === 'url' ? 'text-[#f0f5f0]' : 'text-[#1a2c1a]'
                       }`}
                     >
@@ -240,7 +263,7 @@ const StoryHero = () => {
                     <button
                       type="button"
                       onClick={() => setFormMode('description')}
-                      className={`relative z-10 w-1/2 text-sm font-inter font-medium py-1.5 rounded-full transition-colors duration-300 ${
+                      className={`relative z-10 w-1/2 text-sm font-inter font-medium py-1.5 rounded-full ${
                         formMode === 'description' ? 'text-[#f0f5f0]' : 'text-[#1a2c1a]'
                       }`}
                     >
@@ -248,17 +271,13 @@ const StoryHero = () => {
                     </button>
                   </div>
                 </motion.div>
-                {/* Form */}
-                <form
-                  className="flex flex-col gap-6"
-                  onSubmit={handleSubmit}
-                >
+                <form className="flex flex-col gap-6" onSubmit={handleSubmit}>
                   {formMode === 'url' ? (
                     <motion.input
                       type="text"
                       name="productLink"
-                      placeholder="Paste product link (e.g., Amazon URL)"
-                      className="px-4 py-3 text-[#1a2c1a] font-inter text-lg bg-gradient-to-b from-[#e8f0e8]/60 to-[#d9e2d9]/50 rounded-sm border border-[#3b5f3b] placeholder-[#4a664a] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#88a978]/40 focus:border-[#88a978] hover:border-[#88a978] transition-all duration-300"
+                      placeholder="e.g., https://www.amazon.com/product"
+                      className="px-4 py-3 text-[#1a2c1a] font-inter text-base bg-[#e8f0e8]/60 rounded-md border border-[#3b5f3b]/60 placeholder-[#4a664a] focus:outline-none focus:ring-2 focus:ring-[#88a978]/40"
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ duration: 0.5, ease: 'easeOut', delay: 0.3 }}
@@ -266,15 +285,14 @@ const StoryHero = () => {
                   ) : (
                     <motion.textarea
                       name="productDescription"
-                      placeholder="Describe the product (e.g., a cotton t-shirt made in India)"
+                      placeholder="e.g., Organic cotton t-shirt, made in India"
                       rows="4"
-                      className="px-4 py-3 text-[#1a2c1a] font-inter text-lg bg-gradient-to-b from-[#e8f0e8]/60 to-[#d9e2d9]/50 rounded-sm border border-[#3f5f3b] placeholder-[#4a664a] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#88a978]/40 focus:border-[#88a978] hover:border-[#88a978] resize-none transition-all duration-300"
+                      className="px-4 py-3 text-[#1a2c1a] font-inter text-base bg-[#e8f0e8]/60 rounded-md border border-[#3b5f3b]/60 placeholder-[#4a664a] focus:outline-none focus:ring-2 focus:ring-[#88a978]/40 resize-none"
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ duration: 0.5, ease: 'easeOut', delay: 0.3 }}
                     />
                   )}
-                  {/* Error Message */}
                   {error && (
                     <motion.p
                       className="text-[#f4a261] text-sm text-center"
@@ -285,38 +303,51 @@ const StoryHero = () => {
                       {error}
                     </motion.p>
                   )}
-                  {/* Submit Button */}
                   <motion.button
                     type="submit"
-                    className="px-6 py-2.5 bg-gradient-to-r from-[#506850] to-[#88a978] text-[#f0f5f0] font-inter font-medium text-base rounded-sm border border-[#6e8f6e] hover:from-[#88a978] hover:to-[#a8c7a8] hover:border-[#88a978] hover:shadow-lg hover:shadow-[#88a978]/50 focus:outline-none focus:ring-2 focus:ring-[#88a978]/40 transition-all duration-300"
+                    disabled={isLoading}
+                    className={`px-6 py-3 bg-[#506850] text-[#f0f5f0] font-inter font-medium rounded-md hover:bg-[#88a978] transition-all duration-300 ${
+                      isLoading ? 'opacity-50 cursor-not-allowed' : ''
+                    }`}
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.5, ease: 'easeOut', delay: 0.4 }}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
+                    whileHover={{ scale: isLoading ? 1 : 1.05 }}
+                    whileTap={{ scale: isLoading ? 1 : 0.95 }}
                   >
-                    Submit
+                    {isLoading ? 'Analyzing...' : 'Analyze Now'}
                   </motion.button>
                 </form>
               </div>
             </motion.div>
           )}
         </AnimatePresence>
-        {/* Eco Report Dashboard (Appears After Form Submission) */}
-        {report && !isFormVisible ? (
+        {isLoading && (
+          <motion.div
+            className="mt-8 flex justify-center"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <div className="flex items-center gap-2 p-4 bg-[#e8f0e8]/80 rounded-lg">
+              <div className="w-6 h-6 border-2 border-[#88a978] border-t-transparent rounded-full animate-spin" />
+              <p className="text-[#1a2c1a] font-inter">Generating Eco Report...</p>
+            </div>
+          </motion.div>
+        )}
+        {report && !isFormVisible && !isLoading ? (
           !report.sustainabilityScore || !report.impactMetrics ? (
             renderErrorState()
           ) : (
             <motion.div
-              className="mt-6 flex justify-center"
+              className="mt-8 flex justify-center"
               initial={{ opacity: 0, y: 40 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, ease: 'easeOut' }}
             >
-              <div className="w-full max-w-4xl">
-                {/* Dashboard Title */}
+              <div className="w-full max-w-5xl">
                 <motion.div
-                  className="mb-2 text-center"
+                  className="mb-4 text-center"
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.5, delay: 0.1 }}
@@ -325,7 +356,7 @@ const StoryHero = () => {
                     {dashboardTitleWords.map((word, index) => (
                       <motion.span
                         key={index}
-                        style={{ color: word.color }} // Use inline style instead of Tailwind class
+                        style={{ color: word.color }}
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ duration: 0.6, ease: 'easeOut', delay: index * 0.1 }}
@@ -335,141 +366,88 @@ const StoryHero = () => {
                     ))}
                   </h2>
                 </motion.div>
-                {/* Environment Impact Button */}
                 <motion.div
-                  className="mb-4 text-center"
+                  className="mb-6 text-center"
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.5, delay: 0.2 }}
                 >
                   <div
-                    className="inline-block px-4 py-1 rounded-full text-sm font-inter font-bold shadow-md"
+                    className="inline-block px-4 py-2 rounded-full text-base font-inter font-bold shadow-md"
                     style={{
                       backgroundColor: getEnvironmentImpact(report.sustainabilityScore.value).color,
                       color: '#ffffff',
-                      border: `2px solid ${getEnvironmentImpact(report.sustainabilityScore.value).color}`,
                     }}
                   >
                     {getEnvironmentImpact(report.sustainabilityScore.value).label}
                   </div>
                 </motion.div>
-                {/* Summary (Subtitle) */}
                 <motion.div
-                  className="mb-4 text-center bg-[#f0f5f0]/50 py-2 px-4 rounded-lg border border-[#88a978]/30"
+                  className="mb-6 text-center bg-[#f0f5f0]/60 py-3 px-6 rounded-lg border border-[#88a978]/40"
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.5, delay: 0.3 }}
                 >
                   <p className="text-base font-inter font-medium text-[#2f3b2f]">{report.summary}</p>
                 </motion.div>
-                {/* Dashboard Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Sustainability Score Card */}
-                  <motion.div
-                    className="p-4 bg-[#e8f0e8]/80 rounded-lg shadow-sm border border-[#6e8f6e]/40"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5, delay: 0.4 }}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <ReportCard
+                    title="Sustainability Score"
+                    icon={<FaLeaf className="w-5 h-5 text-[#88a978]" />}
+                    delay={0.4}
                   >
-                    <div className="flex items-center gap-2 mb-2">
-                      <FaLeaf color="#88a978" />
-                      <h3 className="text-base font-inter font-medium text-[#1a2c1a]">Sustainability Score</h3>
-                    </div>
-                    <p className="text-[#2f3b2f] text-xs mb-2 font-roboto-slab">
-                      How eco-friendly your product is on a scale of 10.
+                    <p className="text-[#2f3b2f] text-sm mb-3 font-roboto-slab">
+                      Eco-friendliness on a scale of 10.
                     </p>
-                    <div className="flex items-center justify-between text-[#1a2c1a] text-sm mb-2">
-                      <span>{report.sustainabilityScore.value}/10</span>
-                      <span>{report.sustainabilityScore.max}/10</span>
-                    </div>
-                    <input
-                      type="range"
-                      min="0"
-                      max={report.sustainabilityScore.max}
-                      value={report.sustainabilityScore.value}
-                      readOnly
-                      disabled
-                      className="w-full h-2 bg-[#d9e2d9]/50 rounded-lg appearance-none"
-                      style={{
-                        background: `linear-gradient(to right, #88a978 ${(report.sustainabilityScore.value / report.sustainabilityScore.max) * 100}%, #d9e2d9 ${(report.sustainabilityScore.value / report.sustainabilityScore.max) * 100}%)`,
-                      }}
-                    />
-                    <p className="text-[#2f3b2f] text-xs mt-2 font-playfair-display italic">
-                      {report.aiDescriptions?.sustainabilityScore || 'A glowing badge of your product’s green heart!'}
+                    {renderCircularProgress(report.sustainabilityScore.value, report.sustainabilityScore.max)}
+                    <p className="text-[#2f3b2f] text-sm mt-3 font-playfair-display italic">
+                      {report.aiDescriptions?.sustainabilityScore || 'A measure of your product’s green footprint.'}
                     </p>
-                  </motion.div>
-                  {/* Impact Metrics Cards */}
-                  {report.impactMetrics && report.impactMetrics.length > 0 ? (
-                    report.impactMetrics.map((metric, index) => (
-                      <motion.div
-                        key={index}
-                        className="p-4 bg-[#e8f0e8]/80 rounded-lg shadow-sm border border-[#6e8f6e]/40"
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.5, delay: 0.5 + index * 0.1 }}
-                      >
-                        <div className="flex items-center gap-2 mb-2">
-                          {metric.name === 'Carbon Footprint' && <FaRecycle color="#f4a261" />}
-                          {metric.name === 'Water Usage' && <FaWater color="#4a90e2" />}
-                          {metric.name === 'Energy Consumption' && <FaBolt color="#f7c948" />}
-                          <h3 className="text-base font-inter font-medium text-[#1a2c1a]">{metric.name}</h3>
-                        </div>
-                        <p className="text-[#2f3b2f] text-xs mb-2 font-roboto-slab">
-                          {metric.name === 'Carbon Footprint' && 'CO₂ emissions from producing your product.'}
-                          {metric.name === 'Water Usage' && 'Water used in your product’s creation.'}
-                          {metric.name === 'Energy Consumption' && 'Energy consumed during production.'}
-                        </p>
-                        <div className="flex items-center justify-between text-[#1a2c1a] text-sm mb-2">
-                          <span>{metric.value} {metric.unit}</span>
-                          <span>{metric.max} {metric.unit}</span>
-                        </div>
-                        <input
-                          type="range"
-                          min="0"
-                          max={metric.max}
-                          value={metric.value}
-                          readOnly
-                          disabled
-                          className="w-full h-2 bg-[#d9e2d9]/50 rounded-lg appearance-none"
-                          style={{
-                            background: `linear-gradient(to right, #88a978 ${(metric.value / metric.max) * 100}%, #d9e2d9 ${(metric.value / metric.max) * 100}%)`,
-                          }}
-                        />
-                        <p className="text-[#2f3b2f] text-xs mt-2 font-playfair-display italic">
-                          {report.aiDescriptions?.impactMetrics?.find(desc => desc.name === metric.name)?.description || 'No description available.'}
-                        </p>
-                      </motion.div>
-                    ))
-                  ) : (
-                    <motion.div
-                      className="p-4 bg-[#e8f0e8]/80 rounded-lg shadow-sm border border-[#6e8f6e]/40"
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.5, delay: 0.5 }}
+                  </ReportCard>
+                  {report.impactMetrics.map((metric, index) => (
+                    <ReportCard
+                      key={metric.name}
+                      title={metric.name}
+                      icon={
+                        metric.name === 'Carbon Footprint' ? (
+                          <FaRecycle className="w-5 h-5 text-[#f4a261]" />
+                        ) : metric.name === 'Water Usage' ? (
+                          <FaWater className="w-5 h-5 text-[#4a90e2]" />
+                        ) : (
+                          <FaBolt className="w-5 h-5 text-[#f7c948]" />
+                        )
+                      }
+                      delay={0.5 + index * 0.1}
                     >
-                      <p className="text-[#2f3b2f] text-sm">Impact metrics unavailable.</p>
-                    </motion.div>
-                  )}
-                  {/* Materials Impact Card */}
-                  <motion.div
-                    className="p-4 bg-[#e8f0e8]/80 rounded-lg shadow-sm border border-[#6e8f6e]/40"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5, delay: 0.7 }}
+                      <p className="text-[#2f3b2f] text-sm mb-3 font-roboto-slab">
+                        {metric.name === 'Carbon Footprint' && 'CO₂ emissions from production.'}
+                        {metric.name === 'Water Usage' && 'Water used in production.'}
+                        {metric.name === 'Energy Consumption' && 'Energy used during production.'}
+                      </p>
+                      {renderCircularProgress(
+                        metric.value,
+                        metric.max,
+                        metric.name === 'Carbon Footprint' ? '#f4a261' : metric.name === 'Water Usage' ? '#4a90e2' : '#f7c948'
+                      )}
+                      <p className="text-[#2f3b2f] text-sm mt-3 font-playfair-display italic">
+                        {report.aiDescriptions?.impactMetrics?.find(desc => desc.name === metric.name)?.description || 'No description available.'}
+                      </p>
+                    </ReportCard>
+                  ))}
+                  <ReportCard
+                    title="Materials Impact"
+                    icon={<FaChartPie className="w-5 h-5 text-[#d4b83e]" />}
+                    delay={0.7}
                   >
-                    <div className="flex items-center gap-2 mb-2">
-                      <FaChartPie color="#d4b83e" />
-                      <h3 className="text-base font-inter font-medium text-[#1a2c1a]">Materials Impact</h3>
-                    </div>
-                    <p className="text-[#2f3b2f] text-xs mb-2 font-roboto-slab">
-                      What your product is made of and its eco-impact.
+                    <p className="text-[#2f3b2f] text-sm mb-3 font-roboto-slab">
+                      Composition and eco-impact of materials.
                     </p>
                     <div className="h-24 overflow-y-auto scrollbar-thin scrollbar-thumb-[#88a978] scrollbar-track-[#d9e2d9] pr-2">
-                      {report.materialsImpact && report.materialsImpact.length > 0 ? (
+                      {report.materialsImpact.length > 0 ? (
                         report.materialsImpact.map((item, i) => (
                           <div
                             key={i}
-                            className="flex items-start gap-2 text-xs mb-2 border-b border-[#6e8f6e]/20 pb-2"
+                            className="flex items-start gap-2 text-sm mb-2 border-b border-[#88a978]/20 pb-2"
                           >
                             <div
                               className="w-3 h-3 rounded-full mt-1 flex-shrink-0"
@@ -481,7 +459,7 @@ const StoryHero = () => {
                               <div className="flex items-center justify-between">
                                 <span className="text-[#1a2c1a] font-medium">{item.name}: {item.percentage}%</span>
                                 <span
-                                  className={`px-1 py-0.5 rounded text-xs ${
+                                  className={`px-2 py-1 rounded text-xs ${
                                     item.impact === 'Low'
                                       ? 'bg-[#88a978]/20 text-[#88a978]'
                                       : item.impact === 'High'
@@ -492,141 +470,137 @@ const StoryHero = () => {
                                   {item.impact}
                                 </span>
                               </div>
-                              <p className="text-[#2f3b2f] text-xs">{item.description}</p>
+                              <p className="text-[#2f3b2f] text-sm">{item.description}</p>
                             </div>
                           </div>
                         ))
                       ) : (
-                        <p className="text-[#2f3b2f] text-xs">No material data available.</p>
+                        <p className="text-[#2f3b2f] text-sm">No material data available.</p>
                       )}
                     </div>
-                    <p className="text-[#2f3b2f] text-xs mt-2 font-playfair-display italic">
-                      {report.aiDescriptions?.materialsImpact || 'The building blocks of your product’s eco-story.'}
+                    <p className="text-[#2f3b2f] text-sm mt-3 font-playfair-display italic">
+                      {report.aiDescriptions?.materialsImpact || 'The eco-story of your product’s materials.'}
                     </p>
-                  </motion.div>
-                  {/* Lifecycle Impact Card */}
-                  <motion.div
-                    className="p-4 bg-[#e8f0e8]/80 rounded-lg shadow-sm border border-[#6e8f6e]/40"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5, delay: 0.8 }}
+                  </ReportCard>
+                  <ReportCard
+                    title="Lifecycle Impact"
+                    icon={<FaCogs className="w-5 h-5 text-[#6e8f6e]" />}
+                    delay={0.8}
                   >
-                    <div className="flex items-center gap-2 mb-2">
-                      <FaCogs color="#6e8f6e" />
-                      <h3 className="text-base font-inter font-medium text-[#1a2c1a]">Lifecycle Impact</h3>
-                    </div>
-                    <p className="text-[#2f3b2f] text-xs mb-2 font-roboto-slab">
-                      Environmental impact across your product’s lifecycle stages.
+                    <p className="text-[#2f3b2f] text-sm mb-3 font-roboto-slab">
+                      Impact across product lifecycle stages.
                     </p>
-                    <div className="flex items-end h-24 mb-2">
-                      {report.lifecycleImpact && report.lifecycleImpact.length > 0 ? (
+                    <div className="flex items-end h-24 gap-2">
+                      {report.lifecycleImpact.length > 0 ? (
                         report.lifecycleImpact.map((stage, i) => (
-                          <div key={i} className="flex-1 flex flex-col items-center">
+                          <div key={i} className="flex-1 flex flex-col items-center group relative">
                             <div
-                              className="w-3/4"
+                              className="w-full transition-all duration-300 group-hover:shadow-md"
                               style={{
                                 height: `${stage.percentage}%`,
                                 backgroundColor: stage.impact === 'Low' ? '#88a978' : stage.impact === 'High' ? '#f4a261' : '#d4b83e',
                               }}
                             />
-                            <p className="text-[#1a2c1a] text-xs mt-1">{stage.stage}</p>
-                            <p className="text-[#2f3b2f] text-xs">{stage.description}</p>
+                            <p className="text-[#1a2c1a] text-xs mt-1 font-inter">{stage.stage}</p>
+                            <div className="absolute -top-10 hidden group-hover:block bg-[#1a2c1a] text-[#f0f5f0] text-xs p-2 rounded-md">
+                              {stage.description}
+                            </div>
                           </div>
                         ))
                       ) : (
-                        <p className="text-[#2f3b2f] text-xs">No lifecycle data available.</p>
+                        <p className="text-[#2f3b2f] text-sm">No lifecycle data available.</p>
                       )}
                     </div>
-                    <p className="text-[#2f3b2f] text-xs mt-2 font-playfair-display italic">
-                      {report.aiDescriptions?.lifecycleImpact || 'A journey through your product’s eco-life stages.'}
+                    <p className="text-[#2f3b2f] text-sm mt-3 font-playfair-display italic">
+                      {report.aiDescriptions?.lifecycleImpact || 'The eco-journey of your product.'}
                     </p>
-                  </motion.div>
-                  {/* Eco Tip Card */}
-                  <motion.div
-                    className="p-4 bg-[#e8f0e8]/80 rounded-lg shadow-sm border border-[#6e8f6e]/40"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5, delay: 0.9 }}
+                  </ReportCard>
+                  <ReportCard
+                    title="Certifications"
+                    icon={<FaCertificate className="w-5 h-5 text-[#6e8f6e]" />}
+                    delay={0.85}
                   >
-                    <div className="flex items-center gap-2 mb-2">
-                      <FaLeaf color="#88a978" />
-                      <h3 className="text-base font-inter font-medium text-[#1a2c1a]">Eco Tip</h3>
-                    </div>
-                    <p className="text-[#2f3b2f] text-xs mb-2 font-roboto-slab">
-                      A simple tip to make your product use greener.
+                    <p className="text-[#2f3b2f] text-sm mb-3 font-roboto-slab">
+                      Eco-certifications earned by the product.
                     </p>
-                    <motion.button
+                    <div className="h-24 overflow-y-auto scrollbar-thin scrollbar-thumb-[#88a978] scrollbar-track-[#d9e2d9] pr-2">
+                      {report.certifications && report.certifications.length > 0 ? (
+                        report.certifications.map((cert, i) => (
+                          <div
+                            key={i}
+                            className="flex items-start gap-2 text-sm mb-2 border-b border-[#88a978]/20 pb-2"
+                          >
+                            <div className="w-3 h-3 rounded-full mt-1 flex-shrink-0 bg-[#88a978]" />
+                            <div>
+                              <span className="text-[#1a2c1a] font-medium">{cert.name}</span>
+                              <p className="text-[#2f3b2f] text-sm">{cert.description}</p>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-[#2f3b2f] text-sm">No certifications available.</p>
+                      )}
+                    </div>
+                    <p className="text-[#2f3b2f] text-sm mt-3 font-playfair-display italic">
+                      {report.aiDescriptions?.certifications || 'Badges of your product’s eco-credentials.'}
+                    </p>
+                  </ReportCard>
+                  <ReportCard
+                    title="Eco Tip"
+                    icon={<FaLeaf className="w-5 h-5 text-[#88a978]" />}
+                    delay={0.9}
+                  >
+                    <p className="text-[#2f3b2f] text-sm mb-3 font-roboto-slab">
+                      Practical tip to reduce environmental impact.
+                    </p>
+                    <button
                       onClick={() => setSavedTip(!savedTip)}
-                      className={`w-full flex items-center gap-2 text-[#2f3b2f] text-sm px-2 py-1 rounded-lg ${
-                        savedTip ? 'bg-[#f0f5f0]/50' : 'hover:bg-[#f0f5f0]/30'
-                      }`}
+                      className={`w-full flex items-center gap-2 text-[#2f3b2f] text-sm px-2 py-1 rounded-md ${
+                        savedTip ? 'bg-[#88a978]/20' : 'hover:bg-[#88a978]/10'
+                      } transition-all duration-300`}
                     >
-                      {savedTip && <FaCheck color="#88a978" />}
-                      <span>{report.ecoTip || 'Use sustainably to reduce impact.'}</span>
-                    </motion.button>
-                    <p className="text-[#2f3b2f] text-xs mt-2 font-playfair-display italic">
-                      {report.aiDescriptions?.ecoTip || 'A whisper of wisdom for a greener tomorrow.'}
+                      {savedTip && <FaCheck className="w-4 h-4 text-[#88a978]" />}
+                      <span>{report.ecoTip || 'Opt for sustainable use to minimize impact.'}</span>
+                    </button>
+                    <p className="text-[#2f3b2f] text-sm mt-3 font-playfair-display italic">
+                      {report.aiDescriptions?.ecoTip || 'A green nudge for a better planet.'}
                     </p>
-                  </motion.div>
-                  {/* AI Insight Card */}
-                  <motion.div
-                    className="p-4 bg-[#f0f5f0]/80 rounded-lg shadow-sm border border-[#88a978]"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5, delay: 1.0 }}
+                  </ReportCard>
+                  <ReportCard
+                    title="AI Insight"
+                    icon={<FaLightbulb className="w-5 h-5 text-[#f7c948]" />}
+                    delay={1.0}
                   >
-                    <div className="flex items-center gap-2 mb-2">
-                      <FaLightbulb color="#f7c948" />
-                      <h3 className="text-base font-inter font-medium text-[#1a2c1a]">AI Insight</h3>
-                    </div>
-                    <p className="text-[#2f3b2f] text-xs mb-2 font-roboto-slab">
-                      Smart advice to reduce your product’s impact.
+                    <p className="text-[#2f3b2f] text-sm mb-3 font-roboto-slab">
+                      Smart advice to enhance sustainability.
                     </p>
-                    <p className="text-[#2f3b2f] text-sm">{report.aiInsight || 'Reduce usage to lower environmental impact.'}</p>
-                    <p className="text-[#2f3b2f] text-xs mt-2 font-playfair-display italic">
-                      {report.aiDescriptions?.aiInsight || 'A spark of genius to lighten your eco-load.'}
+                    <p className="text-[#2f3b2f] text-sm">{report.aiInsight || 'Consider alternative materials to reduce impact.'}</p>
+                    <p className="text-[#2f3b2f] text-sm mt-3 font-playfair-display italic">
+                      {report.aiDescriptions?.aiInsight || 'Intelligent guidance for eco-conscious choices.'}
                     </p>
-                  </motion.div>
+                  </ReportCard>
                 </div>
-                {/* Try Another Product Button */}
                 <motion.button
                   onClick={() => {
                     setReport(null);
                     setIsFormVisible(true);
                     setSavedTip(false);
                   }}
-                  className="w-full mt-6 px-6 py-3 bg-gradient-to-r from-[#506850] to-[#88a978] text-[#f0f5f0] font-inter font-medium text-base rounded-sm border border-[#6e8f6e] hover:from-[#88a978] hover:to-[#a8c7a8] hover:border-[#88a978] hover:shadow-lg hover:shadow-[#88a978]/50 transition-all duration-300"
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
+                  className="w-full mt-6 px-6 py-3 bg-[#506850] text-[#f0f5f0] font-inter font-medium rounded-md hover:bg-[#88a978] transition-all duration-300"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
                 >
-                  Try Another Product
+                  Analyze Another Product
                 </motion.button>
               </div>
             </motion.div>
           )
         ) : null}
       </div>
-      {/* Custom Slider and Scrollbar Styles */}
       <style>{`
-        input[type="range"]::-webkit-slider-thumb {
-          -webkit-appearance: none;
-          appearance: none;
-          width: 14px;
-          height: 14px;
-          background: #88a978;
-          border-radius: 50%;
-          box-shadow: 0 0 3px rgba(0, 0, 0, 0.2);
-        }
-        input[type="range"]::-moz-range-thumb {
-          width: 14px;
-          height: 14px;
-          background: #88a978;
-          border-radius: 50%;
-          box-shadow: 0 0 3px rgba(0, 0, 0, 0.2);
-        }
-        input[type="range"]:disabled {
-          opacity: 1;
-          cursor: not-allowed;
+        @keyframes fall {
+          0% { transform: translateY(-100vh) rotate(0deg); opacity: 0.4; }
+          100% { transform: translateY(100vh) rotate(360deg); opacity: 0.1; }
         }
         .scrollbar-thin {
           scrollbar-width: thin;
@@ -646,7 +620,6 @@ const StoryHero = () => {
           background: #6e8f6e;
         }
       `}</style>
-      {/* Load Custom Fonts */}
       <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Slab:wght@400&family=Playfair+Display:ital@1&display=swap" />
     </section>
   );
