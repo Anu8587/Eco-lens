@@ -52,7 +52,7 @@ const callGeminiAPI = async (prompt) => {
   }
 };
 
-// Helper to parse Gemini API response (simplified)
+// Helper to parse Gemini API response
 function parseGeminiResponse(text, productInput) {
   // Base structure for the report
   let report = {
@@ -60,12 +60,14 @@ function parseGeminiResponse(text, productInput) {
     sustainabilityScore: { value: null, max: 10 },
     impactMetrics: [],
     materialsImpact: [],
+    lifecycleImpact: [],
     ecoTip: '',
     aiInsight: '',
     aiDescriptions: {
       sustainabilityScore: '',
       impactMetrics: [],
       materialsImpact: '',
+      lifecycleImpact: '',
       ecoTip: '',
       aiInsight: '',
     },
@@ -95,6 +97,17 @@ function parseGeminiResponse(text, productInput) {
       }));
     };
 
+    // Helper to extract lifecycle stages (e.g., Manufacturing: 40% - High)
+    const extractLifecycleStages = text => {
+      const items = text.matchAll(/(.*?):\s*(\d+)%\s*-\s*(Low|High|Medium)\s*-\s*(.*?)(?=\n|$)/gi);
+      return Array.from(items, match => ({
+        stage: match[1].trim(),
+        percentage: parseInt(match[2]),
+        impact: match[3],
+        description: match[4].trim(),
+      }));
+    };
+
     // Helper to extract score (e.g., 7/10)
     const extractScore = text => {
       const match = text.match(/(\d+)\/(\d+)/);
@@ -102,7 +115,8 @@ function parseGeminiResponse(text, productInput) {
       return null;
     };
 
-    // Parse each line based on expected labels
+    // Parse each line based on expected labels with deduplication
+    const seenMetrics = new Set();
     lines.forEach(line => {
       const lowerLine = line.toLowerCase();
 
@@ -118,24 +132,45 @@ function parseGeminiResponse(text, productInput) {
         if (score) report.sustainabilityScore = score;
       }
 
-      // Impact Metrics (Carbon Footprint, Water Usage, Energy Consumption)
+      // Impact Metrics (Carbon Footprint, Water Usage, Energy Consumption) with deduplication
       if (lowerLine.includes('carbon footprint') || lowerLine.includes('co₂') || lowerLine.includes('emissions')) {
-        const metric = extractMetric(line, ['kg CO₂e', 'kg CO2e', 'kg CO₂'], 50);
-        if (metric) report.impactMetrics.push({ name: 'Carbon Footprint', ...metric });
+        if (!seenMetrics.has('Carbon Footprint')) {
+          const metric = extractMetric(line, ['kg CO₂e', 'kg CO2e', 'kg CO₂'], 50);
+          if (metric) {
+            report.impactMetrics.push({ name: 'Carbon Footprint', ...metric });
+            seenMetrics.add('Carbon Footprint');
+          }
+        }
       }
       if (lowerLine.includes('water') && (lowerLine.includes('usage') || lowerLine.includes('consumption'))) {
-        const metric = extractMetric(line, ['liters', 'litres'], 2000);
-        if (metric) report.impactMetrics.push({ name: 'Water Usage', ...metric });
+        if (!seenMetrics.has('Water Usage')) {
+          const metric = extractMetric(line, ['liters', 'litres'], 2000);
+          if (metric) {
+            report.impactMetrics.push({ name: 'Water Usage', ...metric });
+            seenMetrics.add('Water Usage');
+          }
+        }
       }
       if (lowerLine.includes('energy') && (lowerLine.includes('consumption') || lowerLine.includes('usage'))) {
-        const metric = extractMetric(line, ['kWh', 'kwh'], 100);
-        if (metric) report.impactMetrics.push({ name: 'Energy Consumption', ...metric });
+        if (!seenMetrics.has('Energy Consumption')) {
+          const metric = extractMetric(line, ['kWh', 'kwh'], 100);
+          if (metric) {
+            report.impactMetrics.push({ name: 'Energy Consumption', ...metric });
+            seenMetrics.add('Energy Consumption');
+          }
+        }
       }
 
       // Materials Impact
       if (lowerLine.includes('materials impact')) {
         const materials = extractPercentageList(line);
         if (materials.length > 0) report.materialsImpact = materials;
+      }
+
+      // Lifecycle Impact
+      if (lowerLine.includes('lifecycle impact')) {
+        const lifecycle = extractLifecycleStages(line);
+        if (lifecycle.length > 0) report.lifecycleImpact = lifecycle;
       }
 
       // Eco Tip
@@ -171,6 +206,10 @@ function parseGeminiResponse(text, productInput) {
         const descMatch = line.match(/Description - Materials Impact:\s*(.*)/i);
         if (descMatch) report.aiDescriptions.materialsImpact = descMatch[1].trim();
       }
+      if (lowerLine.includes('description - lifecycle impact')) {
+        const descMatch = line.match(/Description - Lifecycle Impact:\s*(.*)/i);
+        if (descMatch) report.aiDescriptions.lifecycleImpact = descMatch[1].trim();
+      }
       if (lowerLine.includes('description - eco tip')) {
         const descMatch = line.match(/Description - Eco Tip:\s*(.*)/i);
         if (descMatch) report.aiDescriptions.ecoTip = descMatch[1].trim();
@@ -201,6 +240,13 @@ function parseGeminiResponse(text, productInput) {
         description: 'Material data unavailable; consider researching product composition.'
       });
     }
+    if (report.lifecycleImpact.length === 0) {
+      report.lifecycleImpact.push(
+        { stage: 'Manufacturing', percentage: 50, impact: 'Medium', description: 'Moderate energy use during production.' },
+        { stage: 'Usage', percentage: 30, impact: 'Low', description: 'Low energy consumption during use.' },
+        { stage: 'Disposal', percentage: 20, impact: 'High', description: 'Challenging to recycle.' }
+      );
+    }
     if (!report.ecoTip) {
       report.ecoTip = 'Use sustainably to reduce impact.';
     }
@@ -209,22 +255,25 @@ function parseGeminiResponse(text, productInput) {
     }
     // Fallbacks for AI Descriptions
     if (!report.aiDescriptions.sustainabilityScore) {
-      report.aiDescriptions.sustainabilityScore = 'Your product’s green score out of 10.';
+      report.aiDescriptions.sustainabilityScore = 'A glowing badge of your product’s green heart!';
     }
     if (report.aiDescriptions.impactMetrics.length === 0) {
       report.aiDescriptions.impactMetrics.push({ 
         name: 'Carbon Footprint', 
-        description: 'CO₂ emissions from making your product.' 
+        description: 'Like a weekend road trip’s carbon trail!' 
       });
     }
     if (!report.aiDescriptions.materialsImpact) {
-      report.aiDescriptions.materialsImpact = 'What your product is made of and its eco-impact.';
+      report.aiDescriptions.materialsImpact = 'The building blocks of your product’s eco-story.';
+    }
+    if (!report.aiDescriptions.lifecycleImpact) {
+      report.aiDescriptions.lifecycleImpact = 'A journey through your product’s eco-life stages.';
     }
     if (!report.aiDescriptions.ecoTip) {
-      report.aiDescriptions.ecoTip = 'A simple tip to make your product use greener.';
+      report.aiDescriptions.ecoTip = 'A whisper of wisdom for a greener tomorrow.';
     }
     if (!report.aiDescriptions.aiInsight) {
-      report.aiDescriptions.aiInsight = 'Smart advice to reduce your product’s impact.';
+      report.aiDescriptions.aiInsight = 'A spark of genius to lighten your eco-load.';
     }
 
   } catch (error) {
@@ -238,14 +287,20 @@ function parseGeminiResponse(text, productInput) {
       impact: 'Medium',
       description: 'Material data unavailable; consider researching product composition.'
     }];
+    report.lifecycleImpact = [
+      { stage: 'Manufacturing', percentage: 50, impact: 'Medium', description: 'Moderate energy use during production.' },
+      { stage: 'Usage', percentage: 30, impact: 'Low', description: 'Low energy consumption during use.' },
+      { stage: 'Disposal', percentage: 20, impact: 'High', description: 'Challenging to recycle.' }
+    ];
     report.ecoTip = 'Use sustainably to reduce impact.';
     report.aiInsight = 'Analysis unavailable due to parsing error.';
     report.aiDescriptions = {
-      sustainabilityScore: 'Your product’s green score out of 10.',
-      impactMetrics: [{ name: 'Carbon Footprint', description: 'CO₂ emissions from making your product.' }],
-      materialsImpact: 'What your product is made of and its eco-impact.',
-      ecoTip: 'A simple tip to make your product use greener.',
-      aiInsight: 'Smart advice to reduce your product’s impact.',
+      sustainabilityScore: 'A glowing badge of your product’s green heart!',
+      impactMetrics: [{ name: 'Carbon Footprint', description: 'Like a weekend road trip’s carbon trail!' }],
+      materialsImpact: 'The building blocks of your product’s eco-story.',
+      lifecycleImpact: 'A journey through your product’s eco-life stages.',
+      ecoTip: 'A whisper of wisdom for a greener tomorrow.',
+      aiInsight: 'A spark of genius to lighten your eco-load.',
     };
   }
 
@@ -300,12 +355,14 @@ app.post('/api/analyze', async (req, res) => {
       Carbon Footprint: Estimated carbon footprint in kg CO₂e (e.g., 20 kg CO₂e).
       Water Usage: Estimated water usage in liters (e.g., 1500 liters).
       Materials Impact: List of materials with percentages, impact, and a short description (e.g., Recycled Aluminum (75%) - Low - Sourced sustainably, Plastic (25%) - High - Non-biodegradable).
+      Lifecycle Impact: List of lifecycle stages with percentages, impact, and a short description (e.g., Manufacturing: 40% - High - Energy-intensive, Usage: 30% - Low - Minimal energy use, Disposal: 30% - Medium - Partially recyclable).
       Eco Tip: A one-sentence eco tip.
       AI Insight: A one-sentence actionable insight for reducing impact.
       Description - Sustainability Score: A creative one-sentence description of what the sustainability score means.
       Description - Carbon Footprint: A creative one-sentence description of the carbon footprint.
       Description - Water Usage: A creative one-sentence description of the water usage.
       Description - Materials Impact: A creative one-sentence description of the materials impact.
+      Description - Lifecycle Impact: A creative one-sentence description of the lifecycle impact.
       Description - Eco Tip: A creative one-sentence description of the eco tip.
       Description - AI Insight: A creative one-sentence description of the AI insight.
     `;
@@ -327,14 +384,20 @@ app.post('/api/analyze', async (req, res) => {
           impact: 'Medium',
           description: 'Material data unavailable; consider researching product composition.'
         }],
+        lifecycleImpact: [
+          { stage: 'Manufacturing', percentage: 50, impact: 'Medium', description: 'Moderate energy use during production.' },
+          { stage: 'Usage', percentage: 30, impact: 'Low', description: 'Low energy consumption during use.' },
+          { stage: 'Disposal', percentage: 20, impact: 'High', description: 'Challenging to recycle.' }
+        ],
         ecoTip: 'Use sustainably to reduce impact.',
         aiInsight: 'Analysis unavailable due to API error.',
         aiDescriptions: {
-          sustainabilityScore: 'Your product’s green score out of 10.',
-          impactMetrics: [{ name: 'Carbon Footprint', description: 'CO₂ emissions from making your product.' }],
-          materialsImpact: 'What your product is made of and its eco-impact.',
-          ecoTip: 'A simple tip to make your product use greener.',
-          aiInsight: 'Smart advice to reduce your product’s impact.',
+          sustainabilityScore: 'A glowing badge of your product’s green heart!',
+          impactMetrics: [{ name: 'Carbon Footprint', description: 'Like a weekend road trip’s carbon trail!' }],
+          materialsImpact: 'The building blocks of your product’s eco-story.',
+          lifecycleImpact: 'A journey through your product’s eco-life stages.',
+          ecoTip: 'A whisper of wisdom for a greener tomorrow.',
+          aiInsight: 'A spark of genius to lighten your eco-load.',
         },
       });
     }
@@ -361,14 +424,20 @@ app.post('/api/analyze', async (req, res) => {
         impact: 'Medium',
         description: 'Material data unavailable; consider researching product composition.'
       }],
+      lifecycleImpact: [
+        { stage: 'Manufacturing', percentage: 50, impact: 'Medium', description: 'Moderate energy use during production.' },
+        { stage: 'Usage', percentage: 30, impact: 'Low', description: 'Low energy consumption during use.' },
+        { stage: 'Disposal', percentage: 20, impact: 'High', description: 'Challenging to recycle.' }
+      ],
       ecoTip: 'Use sustainably to reduce impact.',
       aiInsight: 'Analysis unavailable due to server error.',
       aiDescriptions: {
-        sustainabilityScore: 'Your product’s green score out of 10.',
-        impactMetrics: [{ name: 'Carbon Footprint', description: 'CO₂ emissions from making your product.' }],
-        materialsImpact: 'What your product is made of and its eco-impact.',
-        ecoTip: 'A simple tip to make your product use greener.',
-        aiInsight: 'Smart advice to reduce your product’s impact.',
+        sustainabilityScore: 'A glowing badge of your product’s green heart!',
+        impactMetrics: [{ name: 'Carbon Footprint', description: 'Like a weekend road trip’s carbon trail!' }],
+        materialsImpact: 'The building blocks of your product’s eco-story.',
+        lifecycleImpact: 'A journey through your product’s eco-life stages.',
+        ecoTip: 'A whisper of wisdom for a greener tomorrow.',
+        aiInsight: 'A spark of genius to lighten your eco-load.',
       },
     });
   }

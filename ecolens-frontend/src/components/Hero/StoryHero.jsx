@@ -2,7 +2,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Navbar from '../Navbar/Navbar';
 import heroImage from '../../assets/hero.png';
 import { useState } from 'react';
-import { FaLeaf, FaCheck, FaRecycle, FaWater, FaBolt, FaChartPie, FaLightbulb } from 'react-icons/fa';
+import { FaLeaf, FaCheck, FaRecycle, FaWater, FaBolt, FaChartPie, FaLightbulb, FaCogs } from 'react-icons/fa';
 import axios from 'axios';
 
 const StoryHero = () => {
@@ -11,7 +11,6 @@ const StoryHero = () => {
   const [report, setReport] = useState(null); // Store AI-generated report data
   const [error, setError] = useState(null); // Store validation errors
   const [savedTip, setSavedTip] = useState(false); // Track if eco tip is saved
-  const [sliderValues, setSliderValues] = useState({}); // Track slider values for interactivity
 
   const headlineWords = [
     { text: 'Uncover', color: '#1a2c1a' },
@@ -21,6 +20,12 @@ const StoryHero = () => {
     { text: 'of', color: '#1a2c1a' },
     { text: 'Your', color: '#2e472e' },
     { text: 'Products', color: '#3b5f3b' },
+  ];
+
+  const dashboardTitleWords = [
+    { text: 'EcoLens', color: '#1a2c1a' },
+    { text: 'Sustainability', color: '#2e472e' },
+    { text: 'Report', color: '#3b5f3b' },
   ];
 
   const handleGetStartedClick = () => {
@@ -52,44 +57,44 @@ const StoryHero = () => {
         productLink: formMode === 'url' ? input : '',
         productDescription: formMode === 'description' ? input : '',
       });
+      console.log('API Response:', response.data); // Debug log
       setReport(response.data);
       setIsFormVisible(false);
-      // Initialize slider values based on the report metrics
-      const initialSliderValues = {};
-      response.data.impactMetrics.forEach((metric, index) => {
-        initialSliderValues[index] = metric.value;
-      });
-      setSliderValues(initialSliderValues);
     } catch (err) {
+      console.error('API Error:', err); // Debug log
       setError(err.response?.data?.error || 'Failed to analyze the product. Please try again.');
+      setReport(null); // Reset report on error
     }
   };
 
-  // Helper to calculate pie chart slices for materials
-  const calculatePieChart = (materials) => {
-    let startAngle = 0;
-    return materials.map((item) => {
-      const percentage = item.percentage;
-      const angle = (percentage / 100) * 360;
-      const slice = {
-        startAngle,
-        endAngle: startAngle + angle,
-        color: item.impact === 'Low' ? '#88a978' : '#f4a261',
-        name: item.name,
-        percentage,
-      };
-      startAngle += angle;
-      return slice;
-    });
+  // Helper to determine environment impact
+  const getEnvironmentImpact = (score) => {
+    if (score >= 7) return { label: 'Good for Environment', color: '#88a978' };
+    if (score <= 3) return { label: 'Bad for Environment', color: '#f4a261' };
+    return { label: 'Moderate for Environment', color: '#d4b83e' };
   };
 
-  // Helper to calculate tree savings for carbon footprint reduction
-  const calculateTreeSavings = (originalValue, currentValue) => {
-    const reduction = originalValue - currentValue;
-    if (reduction <= 0) return 0;
-    // 1 tree absorbs ~25 kg CO₂e per year (simplified estimate)
-    return (reduction / 25).toFixed(1);
-  };
+  // Fallback UI for when report is invalid
+  const renderErrorState = () => (
+    <div className="text-center p-6 bg-[#f4a261]/20 rounded-lg">
+      <p className="text-[#f4a261] text-lg font-inter">
+        Oops! Something went wrong while generating the report.
+      </p>
+      <p className="text-[#2f3b2f] text-sm mt-2">
+        Please try again or enter a different product.
+      </p>
+      <button
+        onClick={() => {
+          setReport(null);
+          setIsFormVisible(true);
+          setSavedTip(false);
+        }}
+        className="mt-4 px-6 py-2 bg-[#506850] text-[#f0f5f0] font-inter font-medium text-base rounded-sm hover:bg-[#88a978] transition-all duration-300"
+      >
+        Try Again
+      </button>
+    </div>
+  );
 
   return (
     <section id="home" className="relative bg-gradient-to-b from-[#d9e2d9] to-[#506850]/40 flex flex-col overflow-hidden">
@@ -130,7 +135,7 @@ const StoryHero = () => {
               {headlineWords.map((word, index) => (
                 <motion.span
                   key={index}
-                  className={`text-[${word.color}]`}
+                  style={{ color: word.color }} // Use inline style instead of Tailwind class
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ duration: 0.6, ease: 'easeOut', delay: index * 0.1 }}
@@ -298,202 +303,310 @@ const StoryHero = () => {
           )}
         </AnimatePresence>
         {/* Eco Report Dashboard (Appears After Form Submission) */}
-        {report && !isFormVisible && (
-          <motion.div
-            className="mt-6 flex justify-center"
-            initial={{ opacity: 0, y: 40 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, ease: 'easeOut' }}
-          >
-            <div className="w-full max-w-4xl">
-              {/* Summary */}
-              <motion.div
-                className="mb-6 text-center"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: 0.1 }}
-              >
-                <h2 className="text-2xl font-inter font-bold text-[#1a2c1a]">{report.summary}</h2>
-              </motion.div>
-              {/* Dashboard Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Sustainability Score Card */}
+        {report && !isFormVisible ? (
+          !report.sustainabilityScore || !report.impactMetrics ? (
+            renderErrorState()
+          ) : (
+            <motion.div
+              className="mt-6 flex justify-center"
+              initial={{ opacity: 0, y: 40 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, ease: 'easeOut' }}
+            >
+              <div className="w-full max-w-4xl">
+                {/* Dashboard Title */}
                 <motion.div
-                  className="p-4 bg-[#e8f0e8]/80 rounded-lg shadow-sm border border-[#6e8f6e]/40"
+                  className="mb-2 text-center"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: 0.1 }}
+                >
+                  <h2 className="text-2xl font-inter font-bold tracking-tight flex justify-center gap-2">
+                    {dashboardTitleWords.map((word, index) => (
+                      <motion.span
+                        key={index}
+                        style={{ color: word.color }} // Use inline style instead of Tailwind class
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ duration: 0.6, ease: 'easeOut', delay: index * 0.1 }}
+                      >
+                        {word.text}
+                      </motion.span>
+                    ))}
+                  </h2>
+                </motion.div>
+                {/* Environment Impact Button */}
+                <motion.div
+                  className="mb-4 text-center"
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.5, delay: 0.2 }}
                 >
-                  <div className="flex items-center gap-2 mb-2">
-                    <FaLeaf color="#88a978" />
-                    <h3 className="text-base font-inter font-medium text-[#1a2c1a]">Sustainability Score</h3>
-                  </div>
-                  <div className="flex items-center justify-between text-[#1a2c1a] text-sm mb-2">
-                    <span>{report.sustainabilityScore.value}/10</span>
-                    <span>{report.sustainabilityScore.max}/10</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max={report.sustainabilityScore.max}
-                    value={report.sustainabilityScore.value}
-                    readOnly
-                    className="w-full h-2 bg-[#d9e2d9]/50 rounded-lg appearance-none"
+                  <div
+                    className="inline-block px-4 py-1 rounded-full text-sm font-inter font-bold shadow-md"
                     style={{
-                      background: `linear-gradient(to right, #88a978 ${(report.sustainabilityScore.value / report.sustainabilityScore.max) * 100}%, #d9e2d9 ${(report.sustainabilityScore.value / report.sustainabilityScore.max) * 100}%)`,
+                      backgroundColor: getEnvironmentImpact(report.sustainabilityScore.value).color,
+                      color: '#ffffff',
+                      border: `2px solid ${getEnvironmentImpact(report.sustainabilityScore.value).color}`,
                     }}
-                  />
+                  >
+                    {getEnvironmentImpact(report.sustainabilityScore.value).label}
+                  </div>
                 </motion.div>
-                {/* Impact Metrics Cards */}
-                {report.impactMetrics.map((metric, index) => (
+                {/* Summary (Subtitle) */}
+                <motion.div
+                  className="mb-4 text-center bg-[#f0f5f0]/50 py-2 px-4 rounded-lg border border-[#88a978]/30"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: 0.3 }}
+                >
+                  <p className="text-base font-inter font-medium text-[#2f3b2f]">{report.summary}</p>
+                </motion.div>
+                {/* Dashboard Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Sustainability Score Card */}
                   <motion.div
-                    key={index}
                     className="p-4 bg-[#e8f0e8]/80 rounded-lg shadow-sm border border-[#6e8f6e]/40"
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5, delay: 0.3 + index * 0.1 }}
+                    transition={{ duration: 0.5, delay: 0.4 }}
                   >
                     <div className="flex items-center gap-2 mb-2">
-                      {metric.name === 'Carbon Footprint' && <FaRecycle color="#88a978" />}
-                      {metric.name === 'Water Usage' && <FaWater color="#88a978" />}
-                      {metric.name === 'Energy Consumption' && <FaBolt color="#88a978" />}
-                      <h3 className="text-base font-inter font-medium text-[#1a2c1a]">{metric.name}</h3>
+                      <FaLeaf color="#88a978" />
+                      <h3 className="text-base font-inter font-medium text-[#1a2c1a]">Sustainability Score</h3>
                     </div>
+                    <p className="text-[#2f3b2f] text-xs mb-2 font-roboto-slab">
+                      How eco-friendly your product is on a scale of 10.
+                    </p>
                     <div className="flex items-center justify-between text-[#1a2c1a] text-sm mb-2">
-                      <span>{sliderValues[index]} {metric.unit}</span>
-                      <span>{metric.max} {metric.unit}</span>
+                      <span>{report.sustainabilityScore.value}/10</span>
+                      <span>{report.sustainabilityScore.max}/10</span>
                     </div>
                     <input
                       type="range"
                       min="0"
-                      max={metric.max}
-                      value={sliderValues[index] || metric.value}
-                      onChange={(e) => {
-                        const newValue = parseFloat(e.target.value);
-                        setSliderValues({ ...sliderValues, [index]: newValue });
-                      }}
-                      className="w-full h-2 bg-[#d9e2d9]/50 rounded-lg appearance-none cursor-pointer"
+                      max={report.sustainabilityScore.max}
+                      value={report.sustainabilityScore.value}
+                      readOnly
+                      disabled
+                      className="w-full h-2 bg-[#d9e2d9]/50 rounded-lg appearance-none"
                       style={{
-                        background: `linear-gradient(to right, #88a978 ${(sliderValues[index] / metric.max) * 100}%, #d9e2d9 ${(sliderValues[index] / metric.max) * 100}%)`,
+                        background: `linear-gradient(to right, #88a978 ${(report.sustainabilityScore.value / report.sustainabilityScore.max) * 100}%, #d9e2d9 ${(report.sustainabilityScore.value / report.sustainabilityScore.max) * 100}%)`,
                       }}
                     />
-                    {metric.name === 'Carbon Footprint' && (
-                      <p className="text-[#2f3b2f] text-xs mt-2">
-                        Reducing saves {calculateTreeSavings(metric.value, sliderValues[index])} trees per year.
-                      </p>
-                    )}
+                    <p className="text-[#2f3b2f] text-xs mt-2 font-playfair-display italic">
+                      {report.aiDescriptions?.sustainabilityScore || 'A glowing badge of your product’s green heart!'}
+                    </p>
                   </motion.div>
-                ))}
-                {/* Materials Impact Card */}
-                <motion.div
-                  className="p-4 bg-[#e8f0e8]/80 rounded-lg shadow-sm border border-[#6e8f6e]/40"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5, delay: 0.5 }}
-                >
-                  <div className="flex items-center gap-2 mb-2">
-                    <FaChartPie color="#88a978" />
-                    <h3 className="text-base font-inter font-medium text-[#1a2c1a]">Materials Impact</h3>
-                  </div>
-                  <div className="flex justify-center mb-2">
-                    <svg width="80" height="80" viewBox="0 0 100 100">
-                      {calculatePieChart(report.materialsImpact).map((slice, i) => {
-                        const startRad = (slice.startAngle * Math.PI) / 180;
-                        const endRad = (slice.endAngle * Math.PI) / 180;
-                        const x1 = 50 + 50 * Math.cos(startRad);
-                        const y1 = 50 + 50 * Math.sin(startRad);
-                        const x2 = 50 + 50 * Math.cos(endRad);
-                        const y2 = 50 + 50 * Math.sin(endRad);
-                        const largeArcFlag = slice.endAngle - slice.startAngle > 180 ? 1 : 0;
-                        const pathData = [
-                          `M 50 50`,
-                          `L ${x1} ${y1}`,
-                          `A 50 50 0 ${largeArcFlag} 1 ${x2} ${y2}`,
-                          `Z`,
-                        ].join(' ');
-                        return (
-                          <path
-                            key={i}
-                            d={pathData}
-                            fill={slice.color}
-                            stroke="#d9e2d9"
-                            strokeWidth="1"
-                          />
-                        );
-                      })}
-                    </svg>
-                  </div>
-                  <div className="space-y-1">
-                    {report.materialsImpact.map((item, i) => (
-                      <div key={i} className="flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-1">
-                          <div
-                            className="w-3 h-3 rounded-full"
-                            style={{ backgroundColor: item.impact === 'Low' ? '#88a978' : '#f4a261' }}
-                          />
-                          <span className="text-[#1a2c1a]">{item.name}: {item.percentage}%</span>
+                  {/* Impact Metrics Cards */}
+                  {report.impactMetrics && report.impactMetrics.length > 0 ? (
+                    report.impactMetrics.map((metric, index) => (
+                      <motion.div
+                        key={index}
+                        className="p-4 bg-[#e8f0e8]/80 rounded-lg shadow-sm border border-[#6e8f6e]/40"
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.5, delay: 0.5 + index * 0.1 }}
+                      >
+                        <div className="flex items-center gap-2 mb-2">
+                          {metric.name === 'Carbon Footprint' && <FaRecycle color="#f4a261" />}
+                          {metric.name === 'Water Usage' && <FaWater color="#4a90e2" />}
+                          {metric.name === 'Energy Consumption' && <FaBolt color="#f7c948" />}
+                          <h3 className="text-base font-inter font-medium text-[#1a2c1a]">{metric.name}</h3>
                         </div>
-                        <span className={`px-1 py-0.5 rounded ${item.impact === 'Low' ? 'bg-[#88a978]/20 text-[#88a978]' : 'bg-[#f4a261]/20 text-[#f4a261]'}`}>
-                          {item.impact}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </motion.div>
-                {/* Eco Tip Card */}
-                <motion.div
-                  className="p-4 bg-[#e8f0e8]/80 rounded-lg shadow-sm border border-[#6e8f6e]/40"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5, delay: 0.6 }}
-                >
-                  <div className="flex items-center gap-2 mb-2">
-                    <FaLeaf color="#88a978" />
-                    <h3 className="text-base font-inter font-medium text-[#1a2c1a]">Eco Tip</h3>
-                  </div>
-                  <motion.button
-                    onClick={() => setSavedTip(!savedTip)}
-                    className={`w-full flex items-center gap-2 text-[#2f3b2f] text-sm px-2 py-1 rounded-lg ${
-                      savedTip ? 'bg-[#f0f5f0]/50' : 'hover:bg-[#f0f5f0]/30'
-                    }`}
+                        <p className="text-[#2f3b2f] text-xs mb-2 font-roboto-slab">
+                          {metric.name === 'Carbon Footprint' && 'CO₂ emissions from producing your product.'}
+                          {metric.name === 'Water Usage' && 'Water used in your product’s creation.'}
+                          {metric.name === 'Energy Consumption' && 'Energy consumed during production.'}
+                        </p>
+                        <div className="flex items-center justify-between text-[#1a2c1a] text-sm mb-2">
+                          <span>{metric.value} {metric.unit}</span>
+                          <span>{metric.max} {metric.unit}</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max={metric.max}
+                          value={metric.value}
+                          readOnly
+                          disabled
+                          className="w-full h-2 bg-[#d9e2d9]/50 rounded-lg appearance-none"
+                          style={{
+                            background: `linear-gradient(to right, #88a978 ${(metric.value / metric.max) * 100}%, #d9e2d9 ${(metric.value / metric.max) * 100}%)`,
+                          }}
+                        />
+                        <p className="text-[#2f3b2f] text-xs mt-2 font-playfair-display italic">
+                          {report.aiDescriptions?.impactMetrics?.find(desc => desc.name === metric.name)?.description || 'No description available.'}
+                        </p>
+                      </motion.div>
+                    ))
+                  ) : (
+                    <motion.div
+                      className="p-4 bg-[#e8f0e8]/80 rounded-lg shadow-sm border border-[#6e8f6e]/40"
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.5, delay: 0.5 }}
+                    >
+                      <p className="text-[#2f3b2f] text-sm">Impact metrics unavailable.</p>
+                    </motion.div>
+                  )}
+                  {/* Materials Impact Card */}
+                  <motion.div
+                    className="p-4 bg-[#e8f0e8]/80 rounded-lg shadow-sm border border-[#6e8f6e]/40"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, delay: 0.7 }}
                   >
-                    {savedTip && <FaCheck color="#88a978" />}
-                    <span>{report.ecoTip}</span>
-                  </motion.button>
-                </motion.div>
-                {/* AI Insight Card */}
-                <motion.div
-                  className="p-4 bg-[#f0f5f0]/80 rounded-lg shadow-sm border border-[#88a978]"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5, delay: 0.7 }}
+                    <div className="flex items-center gap-2 mb-2">
+                      <FaChartPie color="#d4b83e" />
+                      <h3 className="text-base font-inter font-medium text-[#1a2c1a]">Materials Impact</h3>
+                    </div>
+                    <p className="text-[#2f3b2f] text-xs mb-2 font-roboto-slab">
+                      What your product is made of and its eco-impact.
+                    </p>
+                    <div className="h-24 overflow-y-auto scrollbar-thin scrollbar-thumb-[#88a978] scrollbar-track-[#d9e2d9] pr-2">
+                      {report.materialsImpact && report.materialsImpact.length > 0 ? (
+                        report.materialsImpact.map((item, i) => (
+                          <div
+                            key={i}
+                            className="flex items-start gap-2 text-xs mb-2 border-b border-[#6e8f6e]/20 pb-2"
+                          >
+                            <div
+                              className="w-3 h-3 rounded-full mt-1 flex-shrink-0"
+                              style={{
+                                backgroundColor: item.impact === 'Low' ? '#88a978' : item.impact === 'High' ? '#f4a261' : '#d4b83e',
+                              }}
+                            />
+                            <div>
+                              <div className="flex items-center justify-between">
+                                <span className="text-[#1a2c1a] font-medium">{item.name}: {item.percentage}%</span>
+                                <span
+                                  className={`px-1 py-0.5 rounded text-xs ${
+                                    item.impact === 'Low'
+                                      ? 'bg-[#88a978]/20 text-[#88a978]'
+                                      : item.impact === 'High'
+                                      ? 'bg-[#f4a261]/20 text-[#f4a261]'
+                                      : 'bg-[#d4b83e]/20 text-[#d4b83e]'
+                                  }`}
+                                >
+                                  {item.impact}
+                                </span>
+                              </div>
+                              <p className="text-[#2f3b2f] text-xs">{item.description}</p>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-[#2f3b2f] text-xs">No material data available.</p>
+                      )}
+                    </div>
+                    <p className="text-[#2f3b2f] text-xs mt-2 font-playfair-display italic">
+                      {report.aiDescriptions?.materialsImpact || 'The building blocks of your product’s eco-story.'}
+                    </p>
+                  </motion.div>
+                  {/* Lifecycle Impact Card */}
+                  <motion.div
+                    className="p-4 bg-[#e8f0e8]/80 rounded-lg shadow-sm border border-[#6e8f6e]/40"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, delay: 0.8 }}
+                  >
+                    <div className="flex items-center gap-2 mb-2">
+                      <FaCogs color="#6e8f6e" />
+                      <h3 className="text-base font-inter font-medium text-[#1a2c1a]">Lifecycle Impact</h3>
+                    </div>
+                    <p className="text-[#2f3b2f] text-xs mb-2 font-roboto-slab">
+                      Environmental impact across your product’s lifecycle stages.
+                    </p>
+                    <div className="flex items-end h-24 mb-2">
+                      {report.lifecycleImpact && report.lifecycleImpact.length > 0 ? (
+                        report.lifecycleImpact.map((stage, i) => (
+                          <div key={i} className="flex-1 flex flex-col items-center">
+                            <div
+                              className="w-3/4"
+                              style={{
+                                height: `${stage.percentage}%`,
+                                backgroundColor: stage.impact === 'Low' ? '#88a978' : stage.impact === 'High' ? '#f4a261' : '#d4b83e',
+                              }}
+                            />
+                            <p className="text-[#1a2c1a] text-xs mt-1">{stage.stage}</p>
+                            <p className="text-[#2f3b2f] text-xs">{stage.description}</p>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-[#2f3b2f] text-xs">No lifecycle data available.</p>
+                      )}
+                    </div>
+                    <p className="text-[#2f3b2f] text-xs mt-2 font-playfair-display italic">
+                      {report.aiDescriptions?.lifecycleImpact || 'A journey through your product’s eco-life stages.'}
+                    </p>
+                  </motion.div>
+                  {/* Eco Tip Card */}
+                  <motion.div
+                    className="p-4 bg-[#e8f0e8]/80 rounded-lg shadow-sm border border-[#6e8f6e]/40"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, delay: 0.9 }}
+                  >
+                    <div className="flex items-center gap-2 mb-2">
+                      <FaLeaf color="#88a978" />
+                      <h3 className="text-base font-inter font-medium text-[#1a2c1a]">Eco Tip</h3>
+                    </div>
+                    <p className="text-[#2f3b2f] text-xs mb-2 font-roboto-slab">
+                      A simple tip to make your product use greener.
+                    </p>
+                    <motion.button
+                      onClick={() => setSavedTip(!savedTip)}
+                      className={`w-full flex items-center gap-2 text-[#2f3b2f] text-sm px-2 py-1 rounded-lg ${
+                        savedTip ? 'bg-[#f0f5f0]/50' : 'hover:bg-[#f0f5f0]/30'
+                      }`}
+                    >
+                      {savedTip && <FaCheck color="#88a978" />}
+                      <span>{report.ecoTip || 'Use sustainably to reduce impact.'}</span>
+                    </motion.button>
+                    <p className="text-[#2f3b2f] text-xs mt-2 font-playfair-display italic">
+                      {report.aiDescriptions?.ecoTip || 'A whisper of wisdom for a greener tomorrow.'}
+                    </p>
+                  </motion.div>
+                  {/* AI Insight Card */}
+                  <motion.div
+                    className="p-4 bg-[#f0f5f0]/80 rounded-lg shadow-sm border border-[#88a978]"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, delay: 1.0 }}
+                  >
+                    <div className="flex items-center gap-2 mb-2">
+                      <FaLightbulb color="#f7c948" />
+                      <h3 className="text-base font-inter font-medium text-[#1a2c1a]">AI Insight</h3>
+                    </div>
+                    <p className="text-[#2f3b2f] text-xs mb-2 font-roboto-slab">
+                      Smart advice to reduce your product’s impact.
+                    </p>
+                    <p className="text-[#2f3b2f] text-sm">{report.aiInsight || 'Reduce usage to lower environmental impact.'}</p>
+                    <p className="text-[#2f3b2f] text-xs mt-2 font-playfair-display italic">
+                      {report.aiDescriptions?.aiInsight || 'A spark of genius to lighten your eco-load.'}
+                    </p>
+                  </motion.div>
+                </div>
+                {/* Try Another Product Button */}
+                <motion.button
+                  onClick={() => {
+                    setReport(null);
+                    setIsFormVisible(true);
+                    setSavedTip(false);
+                  }}
+                  className="w-full mt-6 px-6 py-3 bg-gradient-to-r from-[#506850] to-[#88a978] text-[#f0f5f0] font-inter font-medium text-base rounded-sm border border-[#6e8f6e] hover:from-[#88a978] hover:to-[#a8c7a8] hover:border-[#88a978] hover:shadow-lg hover:shadow-[#88a978]/50 transition-all duration-300"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
                 >
-                  <div className="flex items-center gap-2 mb-2">
-                    <FaLightbulb color="#88a978" />
-                    <h3 className="text-base font-inter font-medium text-[#1a2c1a]">AI Insight</h3>
-                  </div>
-                  <p className="text-[#2f3b2f] text-sm">{report.aiInsight}</p>
-                </motion.div>
+                  Try Another Product
+                </motion.button>
               </div>
-              {/* Try Another Product Button */}
-              <motion.button
-                onClick={() => {
-                  setReport(null);
-                  setIsFormVisible(true);
-                  setSavedTip(false);
-                  setSliderValues({});
-                }}
-                className="w-full mt-6 px-6 py-3 bg-gradient-to-r from-[#506850] to-[#88a978] text-[#f0f5f0] font-inter font-medium text-base rounded-sm border border-[#6e8f6e] hover:from-[#88a978] hover:to-[#a8c7a8] hover:border-[#88a978] hover:shadow-lg hover:shadow-[#88a978]/50 transition-all duration-300"
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                Try Another Product
-              </motion.button>
-            </div>
-          </motion.div>
-        )}
+            </motion.div>
+          )
+        ) : null}
       </div>
-      {/* Custom Slider Styles */}
+      {/* Custom Slider and Scrollbar Styles */}
       <style>{`
         input[type="range"]::-webkit-slider-thumb {
           -webkit-appearance: none;
@@ -502,7 +615,6 @@ const StoryHero = () => {
           height: 14px;
           background: #88a978;
           border-radius: 50%;
-          cursor: pointer;
           box-shadow: 0 0 3px rgba(0, 0, 0, 0.2);
         }
         input[type="range"]::-moz-range-thumb {
@@ -510,10 +622,32 @@ const StoryHero = () => {
           height: 14px;
           background: #88a978;
           border-radius: 50%;
-          cursor: pointer;
           box-shadow: 0 0 3px rgba(0, 0, 0, 0.2);
         }
+        input[type="range"]:disabled {
+          opacity: 1;
+          cursor: not-allowed;
+        }
+        .scrollbar-thin {
+          scrollbar-width: thin;
+        }
+        .scrollbar-thin::-webkit-scrollbar {
+          width: 6px;
+        }
+        .scrollbar-thin::-webkit-scrollbar-track {
+          background: #d9e2d9;
+          border-radius: 3px;
+        }
+        .scrollbar-thin::-webkit-scrollbar-thumb {
+          background: #88a978;
+          border-radius: 3px;
+        }
+        .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+          background: #6e8f6e;
+        }
       `}</style>
+      {/* Load Custom Fonts */}
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Slab:wght@400&family=Playfair+Display:ital@1&display=swap" />
     </section>
   );
 };
