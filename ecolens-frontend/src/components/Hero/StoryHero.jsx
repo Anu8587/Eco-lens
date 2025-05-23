@@ -138,7 +138,7 @@ const StoryHero = () => {
     <section id="home" className="relative bg-gradient-to-b from-[#e8f0e8] to-[#506850]/30 flex flex-col min-h-screen overflow-hidden">
       <Navbar />
       <div className="absolute inset-0 pointer-events-none">
-        {[...Array(100)].map((_, i) => (
+        {[...Array(150)].map((_, i) => (
           <svg
             key={i}
             className="absolute text-[#506850]/60"
