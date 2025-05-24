@@ -1,6 +1,3 @@
-Here’s a **concise and professional version** of your README, ideal for a GitHub repository. It keeps the essentials while removing redundancies and improving structure:
-
----
 
 # 🌿 EcoLens  Website
 
