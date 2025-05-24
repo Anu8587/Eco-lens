@@ -70,7 +70,7 @@ const StoryHero = () => {
     setError(null);
     setIsLoading(true);
     try {
-      const response = await axios.post('https://eco-lens-zm5x.onrender.com', {
+      const response = await axios.post('https://eco-lens-zm5x.onrender.com/api/analyze', {
         productLink: formMode === 'url' ? input : '',
         productDescription: formMode === 'description' ? input : '',
       });
