@@ -2,6 +2,7 @@
 # 🌿 EcoLens  Website
 
 **EcoLens** is the official website that promotes eco-friendly shopping by displaying sustainability scores and tips for products on platforms like Amazon, Flipkart, and Myntra.
+![image](https://github.com/user-attachments/assets/03ba1dea-c505-4269-aa4f-b7f28a1d6805)
 
 ## 🔍 Features
 
